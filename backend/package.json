@@ -11,10 +11,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "hono": "^4.12.29"
+    "bcryptjs": "^3.0.3",
+    "hono": "^4.12.29",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260712.1",
+    "@types/bcryptjs": "^2.4.6",
     "typescript": "^7.0.2",
     "wrangler": "^4.110.0"
   }
