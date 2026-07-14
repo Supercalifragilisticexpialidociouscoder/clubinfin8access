@@ -33,12 +33,19 @@ jobs:
         run: cd frontend && npm ci
       - name: Build
         run: cd frontend && npm run build
+      - name: Run Diagnostics
+        run: |
+          pwd
+          ls -la
+          ls -R frontend
+          ls -R frontend/dist || true
+          test -f frontend/dist/index.html && echo "index.html exists" || echo "index.html missing"
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './frontend/dist'
+          path: frontend/dist
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
