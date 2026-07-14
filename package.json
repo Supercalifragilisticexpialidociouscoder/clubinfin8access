@@ -1,9 +1,4 @@
 {
-  "name": "clubpass-monorepo",
-  "private": true,
-  "scripts": {
-    "build": "cd frontend && npm install && npm run build"
-  },
   "dependencies": {
     "node": "^26.5.0"
   }
