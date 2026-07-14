@@ -2,9 +2,14 @@
   "name": "clubpass-monorepo",
   "private": true,
   "scripts": {
-    "build": "cd frontend && npm install && npm run build"
+    "build": "cd frontend && npm install && npm run build",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "dependencies": {
     "node": "^26.5.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.110.0"
   }
 }
