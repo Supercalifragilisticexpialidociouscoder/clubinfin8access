@@ -313,8 +313,13 @@ export default function StudentDashboard() {
 
                 {/* QR Code */}
                 {qrDataUrl && (
-                  <div className="mt-5 pt-4 border-t border-white/5 flex justify-center">
-                    <img src={qrDataUrl} alt="QR Code" className="w-40 h-40 rounded-xl" />
+                  <div className="mt-5 pt-4 border-t border-white/5">
+                    <p className="text-xs text-slate-500 uppercase mb-2">QR Code</p>
+                    <div className="flex flex-col items-center">
+                      <img src={qrDataUrl} alt="Student QR" className="w-40 h-40 rounded-xl bg-white p-2" />
+                      <p className="text-sm font-medium text-slate-200 mt-3">{profile.member.member_id}</p>
+                      <p className="text-xs text-green-400 font-medium uppercase tracking-wider mt-1">{profile.member.status || 'Active'}</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -322,12 +327,9 @@ export default function StudentDashboard() {
 
             {/* Action Buttons */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <ActionButton icon={QrCode} label="Fullscreen QR" onClick={() => setShowFullscreenQR(true)} />
-              <ActionButton icon={Download} label="Download QR" onClick={downloadQR} />
-              <ActionButton icon={Download} label="Download PNG" onClick={downloadPNG} />
-              <ActionButton icon={FileText} label="Download PDF" onClick={downloadPDF} />
-              <ActionButton icon={Printer} label="Print QR" onClick={printQR} />
               <ActionButton icon={Maximize2} label="View QR" onClick={() => setShowFullscreenQR(true)} />
+              <ActionButton icon={Download} label="Download QR (PNG)" onClick={downloadQR} />
+              <ActionButton icon={QrCode} label="Fullscreen QR" onClick={() => setShowFullscreenQR(true)} />
             </div>
           </div>
         )}

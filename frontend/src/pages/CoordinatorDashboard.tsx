@@ -302,7 +302,7 @@ export default function CoordinatorDashboard() {
                         <td className="p-4">
                           <div className="flex items-center gap-2">
                             <button onClick={() => navigate(`/verify/${m.uuid}`)} title="View Profile" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><ExternalLink className="w-4 h-4" /></button>
-                            <button onClick={() => generateQR(m)} title="Manage QR" className="p-1.5 rounded-lg hover:bg-purple-500/20 text-purple-400 transition-colors"><QrCode className="w-4 h-4" /></button>
+                            <button onClick={() => generateQR(m)} title="View QR" className="p-1.5 rounded-lg hover:bg-purple-500/20 text-purple-400 transition-colors"><QrCode className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>

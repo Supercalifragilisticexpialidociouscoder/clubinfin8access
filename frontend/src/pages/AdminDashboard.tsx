@@ -9,8 +9,9 @@ import {
   UserPlus, Building2, Settings, Activity, Bell, LogOut,
   CheckCircle2, XCircle, ChevronLeft, ChevronRight, Plus, Pencil,
   UserX, UserCheck, RotateCcw, ArrowRightLeft, Calendar, Clock,
-  FileText, AlertTriangle, Trash2, Eye
+  FileText, AlertTriangle, Trash2, Eye, QrCode, Printer, Maximize2
 } from 'lucide-react';
+import QRCode from 'qrcode';
 
 type TabKey = 'overview' | 'members' | 'permissions' | 'audit' | 'export' | 'users' | 'clubs' | 'settings' | 'health' | 'notifications';
 
@@ -46,6 +47,7 @@ export default function AdminDashboard() {
   const [showEditClub, setShowEditClub] = useState<any>(null);
   const [showResetPassword, setShowResetPassword] = useState<any>(null);
   const [showTransfer, setShowTransfer] = useState<any>(null);
+  const [showViewQR, setShowViewQR] = useState<any>(null);
   const [clubStats, setClubStats] = useState<any>(null);
 
   // Confirm dialog
@@ -291,6 +293,7 @@ export default function AdminDashboard() {
       {showAddClub && <ClubFormModal onSave={createClub} onClose={() => setShowAddClub(false)} />}
       {showEditClub && <ClubFormModal club={showEditClub} onSave={(d) => updateClub(showEditClub.id, d)} onClose={() => setShowEditClub(null)} />}
       {showTransfer && <TransferModal member={showTransfer} clubs={clubs} onTransfer={(clubId) => transferMember(showTransfer.uuid, clubId)} onClose={() => setShowTransfer(null)} />}
+      {showViewQR && <ViewQRModal member={showViewQR} settings={settingsData} onClose={() => setShowViewQR(null)} />}
 
       {/* Top Bar */}
       <header className="glass border-b border-white/5 sticky top-0 z-50">
@@ -428,7 +431,10 @@ export default function AdminDashboard() {
                         <td className="p-4">
                           <div className="flex items-center gap-1">
                             <button onClick={() => setShowEditMember(m)} title="Edit" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => navigate(`/verify/${m.uuid}`)} title="View" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><Eye className="w-3.5 h-3.5" /></button>
+                          {m.member_type === 'student' && (
+                            <button onClick={() => setShowViewQR(m)} title="View QR" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><QrCode className="w-3.5 h-3.5" /></button>
+                          )}
+                          <button onClick={() => navigate(`/verify/${m.uuid}`)} title="Verify Page" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><Eye className="w-3.5 h-3.5" /></button>
                             <button onClick={() => setShowTransfer(m)} title="Transfer" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><ArrowRightLeft className="w-3.5 h-3.5" /></button>
                             <button onClick={() => setConfirm({ open: true, title: 'Regenerate QR', message: `This will invalidate the current QR for ${m.full_name}. Continue?`, action: () => regenerateQR(m.uuid) })} title="Regenerate QR" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><RotateCcw className="w-3.5 h-3.5" /></button>
                             <button onClick={() => setConfirm({ open: true, title: 'Reset Password', message: `Reset password for ${m.full_name} to their roll number?`, action: () => resetStudentPassword(m.uuid) })} title="Reset Password" className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"><RotateCcw className="w-3 h-3" /></button>
@@ -919,6 +925,74 @@ function TransferModal({ member, clubs, onTransfer, onClose }: { member: any; cl
         <div className="flex gap-3 pt-2">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-medium transition-colors">Cancel</button>
           <button onClick={() => { if (clubId) onTransfer(parseInt(clubId)); }} disabled={!clubId} className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors disabled:opacity-50">Transfer</button>
+        </div>
+      </div>
+    </ModalWrapper>
+  );
+}
+
+function ViewQRModal({ member, settings, onClose }: { member: any; settings: any; onClose: () => void }) {
+  const [qrDataUrl, setQrDataUrl] = useState('');
+
+  useEffect(() => {
+    const generateQR = async () => {
+      const prefix = settings?.qr_url_prefix || 'https://clubpass.pages.dev/verify/';
+      const url = `${prefix}${member.uuid}`;
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 250,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+      setQrDataUrl(dataUrl);
+    };
+    if (member?.uuid) generateQR();
+  }, [member, settings]);
+
+  const downloadQR = () => {
+    if (!qrDataUrl) return;
+    const a = document.createElement('a');
+    a.href = qrDataUrl;
+    a.download = `ClubPass-${member.roll_number || 'QR'}.png`;
+    a.click();
+  };
+
+  const printQR = () => {
+    if (!qrDataUrl) return;
+    const win = window.open('');
+    if (!win) return;
+    win.document.write(`
+      <html>
+        <head><title>Print QR - ${member.full_name}</title></head>
+        <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;">
+          <h2>${member.full_name}</h2>
+          <p>${member.roll_number}</p>
+          <img src="${qrDataUrl}" style="width:300px;height:300px;" />
+          <script>window.onload = function() { window.print(); window.close(); }</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
+  return (
+    <ModalWrapper title={`Student QR — ${member.full_name}`} onClose={onClose}>
+      <div className="flex flex-col items-center space-y-4">
+        {qrDataUrl ? (
+          <img src={qrDataUrl} alt="QR Code" className="w-48 h-48 bg-white p-2 rounded-xl" />
+        ) : (
+          <div className="w-48 h-48 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center text-slate-500">Generating...</div>
+        )}
+        <div className="text-center">
+          <p className="text-lg font-bold text-white">{member.roll_number}</p>
+          <p className="text-sm text-slate-400 mt-1">{member.member_id || member.uuid}</p>
+        </div>
+        <div className="flex w-full gap-3 pt-2">
+          <button onClick={downloadQR} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-sm font-medium transition-colors">
+            <Download className="w-4 h-4" /> Download
+          </button>
+          <button onClick={printQR} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors">
+            <Printer className="w-4 h-4" /> Print
+          </button>
         </div>
       </div>
     </ModalWrapper>
