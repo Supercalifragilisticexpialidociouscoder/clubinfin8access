@@ -171,7 +171,7 @@ export default function CoordinatorDashboard() {
     if (!qrDataUrl || !selectedMember) return;
     const a = document.createElement('a');
     a.href = qrDataUrl;
-    a.download = `ClubPass-${selectedMember.roll_number}-QR.png`;
+    a.download = `Infin8Access-${selectedMember.roll_number}-QR.png`;
     a.click();
     toast('success', 'QR code downloaded.');
   };
@@ -185,7 +185,7 @@ export default function CoordinatorDashboard() {
           <h2>${selectedMember.full_name}</h2>
           <p>${selectedMember.roll_number} | ${selectedMember.member_id}</p>
           <img src="${qrDataUrl}" style="width:300px;height:300px;" />
-          <p style="font-size:12px;color:#666;">ClubPass v1.2</p>
+          <p style="font-size:12px;color:#666;">Infin8 Access v1.2</p>
         </div>
       </body></html>`);
       w.document.close();
@@ -236,7 +236,7 @@ export default function CoordinatorDashboard() {
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white tracking-wide">ClubPass</h1>
+              <h1 className="text-sm font-bold text-white tracking-wide">Infin8 Access</h1>
               <p className="text-xs text-purple-400/80 font-medium tracking-wider uppercase">Faculty Coordinator</p>
             </div>
           </div>
@@ -281,8 +281,7 @@ export default function CoordinatorDashboard() {
                   <thead>
                     <tr className="border-b border-white/5 bg-white/[0.02]">
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Student</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Roll No</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase hidden md:table-cell">Dept</th>
+
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Status</th>
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
                     </tr>
@@ -293,11 +292,9 @@ export default function CoordinatorDashboard() {
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/30 to-fuchsia-500/30 flex items-center justify-center text-xs font-bold text-white">{m.full_name?.charAt(0)}</div>
-                            <div><p className="text-white font-medium">{m.full_name}</p><p className="text-xs text-slate-500">{m.member_id}</p></div>
+                            <div><p className="text-white font-medium">{m.full_name}</p><p className="text-xs text-slate-500">{m.roll_number} &middot; {m.department} &middot; Year {m.year} &middot; Section {m.section} &middot; {m.club_name || user?.club_name}</p></div>
                           </div>
                         </td>
-                        <td className="p-4 text-slate-300 font-mono text-xs">{m.roll_number}</td>
-                        <td className="p-4 text-slate-400 hidden md:table-cell">{m.department}</td>
                         <td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/15 text-slate-400 border border-slate-500/20'}`}>{m.status || 'active'}</span></td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
@@ -332,8 +329,9 @@ export default function CoordinatorDashboard() {
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold">{p.member_name?.charAt(0)}</div>
                         <div>
-                          <p className="text-white font-medium">{p.member_name} <span className="text-purple-300 font-mono ml-2 text-sm">{p.roll_number}</span></p>
-                          <p className="text-xs text-slate-400 mt-1">Purpose: {p.purpose} &middot; Approved by {p.hod_name}</p>
+                          <p className="text-white font-medium">{p.member_name}</p>
+                          <p className="text-xs text-slate-400 font-mono mt-0.5">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name || user?.club_name}</p>
+                          <p className="text-xs text-slate-500 mt-1">Purpose: {p.purpose} &middot; Approved by {p.hod_name}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-right">
@@ -372,8 +370,9 @@ export default function CoordinatorDashboard() {
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">{p.member_name?.charAt(0)}</div>
                       <div>
-                        <p className="text-white font-medium">{p.member_name} <span className="text-emerald-300 font-mono ml-2 text-sm">{p.roll_number}</span></p>
-                        <p className="text-xs text-slate-400 mt-1">Purpose: {p.purpose} &middot; Dept: {p.department}</p>
+                        <p className="text-white font-medium">{p.member_name}</p>
+                        <p className="text-xs text-slate-400 font-mono mt-0.5">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name || user?.club_name}</p>
+                        <p className="text-xs text-slate-500 mt-1">Purpose: {p.purpose}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-6 text-right">
@@ -399,7 +398,7 @@ export default function CoordinatorDashboard() {
                   <tbody className="divide-y divide-white/5">
                     {historyPermissions.map((p: any) => (
                       <tr key={p.id} className="hover:bg-white/[0.02]">
-                        <td className="p-4"><p className="text-white font-medium">{p.member_name}</p><p className="text-xs text-slate-500 font-mono">{p.roll_number}</p></td>
+                        <td className="p-4"><p className="text-white font-medium">{p.member_name}</p><p className="text-xs text-slate-500 font-mono">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name || user?.club_name}</p></td>
                         <td className="p-4 text-slate-300"><p className="text-xs">{p.date}</p><p className="text-xs text-slate-500">{p.time}</p></td>
                         <td className="p-4 text-xs space-y-1"><p className="text-slate-400">Purpose: {p.purpose}</p><p className="text-slate-500">Processed by {p.hod_name}</p></td>
                         <td className="p-4">

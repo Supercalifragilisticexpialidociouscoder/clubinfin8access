@@ -228,7 +228,8 @@ export default function VerifyMember() {
 
           <div className="p-6 grid grid-cols-2 gap-4">
             <InfoRow icon={Building2} label="Department" value={member.department} />
-            <InfoRow icon={Calendar} label="Year / Section" value={`Year ${member.year || 1} — ${member.section || 'N/A'}`} />
+            <InfoRow icon={Calendar} label="Year" value={member.year || 1} />
+            <InfoRow icon={Calendar} label="Section" value={member.section || 'N/A'} />
             <InfoRow icon={Shield} label="Club" value={member.club || 'N/A'} highlight />
             <InfoRow icon={User} label="Position" value={member.position || 'Member'} />
             <InfoRow icon={Mail} label="Email" value={member.email || 'N/A'} full />
@@ -376,7 +377,7 @@ export default function VerifyMember() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-600 pb-4">
-          ClubPass v1.2
+          Infin8 Access v1.2
         </p>
       </div>
     </div>

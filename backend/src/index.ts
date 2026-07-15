@@ -725,7 +725,7 @@ app.get('/api/permissions', requireAuth, async (c) => {
 
   try {
     let query = `
-      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, c.name as club_name
+      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
       FROM permissions p
       LEFT JOIN hods h ON p.hod_id = h.id
       LEFT JOIN members m ON m.uuid = p.member_uuid
@@ -1112,7 +1112,7 @@ app.get('/api/export/permissions', requireAuth, requireRole('super_admin', 'hod'
 
   try {
     let query = `
-      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, c.name as club_name
+      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
       FROM permissions p
       LEFT JOIN hods h ON p.hod_id = h.id
       LEFT JOIN members m ON m.uuid = p.member_uuid

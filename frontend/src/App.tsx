@@ -47,7 +47,7 @@ function NotFound() {
         >
           Go to Login
         </a>
-        <p className="text-xs text-slate-600 mt-6">ClubPass v1.2</p>
+        <p className="text-xs text-slate-600 mt-6">Infin8 Access v1.2</p>
       </div>
     </div>
   );

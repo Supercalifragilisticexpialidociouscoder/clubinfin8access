@@ -144,7 +144,7 @@ export default function HODDashboard() {
   }, [activeTab, scannedUuid]);
 
   const onScanSuccess = (decodedText: string) => {
-    // Expecting URL like https://clubpass.com/verify/UUID
+    // Expecting URL like https://infin8access.pages.dev/verify/UUID
     const parts = decodedText.split('/');
     const uuid = parts[parts.length - 1];
     if (uuid && uuid.length > 10) {
@@ -250,7 +250,7 @@ export default function HODDashboard() {
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white tracking-wide">ClubPass</h1>
+              <h1 className="text-sm font-bold text-white tracking-wide">Infin8 Access</h1>
               <p className="text-xs text-emerald-400/80 font-medium tracking-wider uppercase">Head of Department</p>
             </div>
           </div>
@@ -289,7 +289,7 @@ export default function HODDashboard() {
               <div className="glass-card rounded-2xl overflow-hidden p-6">
                 <div className="text-center mb-6">
                   <h2 className="text-xl font-bold text-white mb-2">Scan Student QR</h2>
-                  <p className="text-sm text-slate-400">Position the student's digital ClubPass within the frame.</p>
+                  <p className="text-sm text-slate-400">Position the student's digital Infin8 Access pass within the frame.</p>
                 </div>
                 <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-square max-w-md mx-auto relative">
                   <div id="reader" className="w-full h-full" />
@@ -320,8 +320,10 @@ export default function HODDashboard() {
                       <Search className="w-3.5 h-3.5" /> Scan Another
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-6">
-                    <div><p className="text-xs text-slate-500 uppercase mb-0.5">Department</p><p className="text-white">{scannedData.member.department} &middot; Yr {scannedData.member.year}</p></div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-6">
+                    <div><p className="text-xs text-slate-500 uppercase mb-0.5">Department</p><p className="text-white">{scannedData.member.department}</p></div>
+                    <div><p className="text-xs text-slate-500 uppercase mb-0.5">Year</p><p className="text-white">{scannedData.member.year}</p></div>
+                    <div><p className="text-xs text-slate-500 uppercase mb-0.5">Section</p><p className="text-white">{scannedData.member.section}</p></div>
                     <div><p className="text-xs text-slate-500 uppercase mb-0.5">Club</p><p className="text-blue-300 font-medium">{scannedData.member.club}</p></div>
                   </div>
                   
@@ -375,8 +377,6 @@ export default function HODDashboard() {
                   <thead>
                     <tr className="border-b border-white/5 bg-white/[0.02]">
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Student</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase hidden md:table-cell">Roll Number</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase hidden md:table-cell">Club</th>
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Status</th>
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Action</th>
                     </tr>
@@ -387,12 +387,10 @@ export default function HODDashboard() {
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-xs font-bold text-emerald-400">{m.full_name?.charAt(0)}</div>
-                            <div><p className="text-white font-medium">{m.full_name}</p><p className="text-xs text-slate-500 md:hidden">{m.roll_number}</p></div>
+                            <div><p className="text-white font-medium">{m.full_name}</p><p className="text-xs text-slate-500">{m.roll_number} &middot; {m.department} &middot; Year {m.year} &middot; Section {m.section} &middot; {m.club_name}</p></div>
                           </div>
                         </td>
-                        <td className="p-4 text-slate-300 font-mono hidden md:table-cell">{m.roll_number}</td>
-                        <td className="p-4 text-slate-400 hidden md:table-cell">{m.club_name || 'N/A'}</td>
-                        <td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${m.status === 'active' ? 'status-active' : 'status-inactive'}`}>{m.status}</span></td>
+                        <td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/15 text-slate-400 border border-slate-500/20'}`}>{m.status}</span></td>
                         <td className="p-4"><button className="text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1">View <ArrowRight className="w-3 h-3" /></button></td>
                       </tr>
                     ))}
@@ -421,8 +419,9 @@ export default function HODDashboard() {
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold">{p.member_name?.charAt(0)}</div>
                         <div>
-                          <p className="text-white font-medium">{p.member_name} <span className="text-blue-300 font-mono ml-2 text-sm">{p.roll_number}</span></p>
-                          <p className="text-xs text-slate-400 mt-1">Club: {p.club_name} &middot; Purpose: {p.purpose}</p>
+                          <p className="text-white font-medium">{p.member_name}</p>
+                          <p className="text-xs text-slate-400 font-mono mt-0.5">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name}</p>
+                          <p className="text-xs text-slate-500 mt-1">Purpose: {p.purpose}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-right">
@@ -466,8 +465,9 @@ export default function HODDashboard() {
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">{p.member_name?.charAt(0)}</div>
                       <div>
-                        <p className="text-white font-medium">{p.member_name} <span className="text-emerald-300 font-mono ml-2 text-sm">{p.roll_number}</span></p>
-                        <p className="text-xs text-slate-400 mt-1">Club: {p.club_name} &middot; Purpose: {p.purpose}</p>
+                        <p className="text-white font-medium">{p.member_name}</p>
+                        <p className="text-xs text-slate-400 font-mono mt-0.5">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name}</p>
+                        <p className="text-xs text-slate-500 mt-1">Purpose: {p.purpose}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-6 text-right">
@@ -493,7 +493,7 @@ export default function HODDashboard() {
                   <tbody className="divide-y divide-white/5">
                     {permissions.map((p: any) => (
                       <tr key={p.id} className="hover:bg-white/[0.02]">
-                        <td className="p-4"><p className="text-white font-medium">{p.member_name}</p><p className="text-xs text-slate-500 font-mono">{p.roll_number}</p></td>
+                        <td className="p-4"><p className="text-white font-medium">{p.member_name}</p><p className="text-xs text-slate-500 font-mono">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name}</p></td>
                         <td className="p-4 text-slate-300"><p className="text-xs">{p.date}</p><p className="text-xs text-slate-500">{p.time}</p></td>
                         <td className="p-4 text-xs space-y-1"><p className="text-blue-300">{p.club_name}</p><p className="text-slate-400">Purpose: {p.purpose}</p></td>
                         <td className="p-4">

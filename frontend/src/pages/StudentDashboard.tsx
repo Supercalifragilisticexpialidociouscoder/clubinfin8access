@@ -62,7 +62,7 @@ export default function StudentDashboard() {
     if (!qrDataUrl || !profile) return;
     const a = document.createElement('a');
     a.href = qrDataUrl;
-    a.download = `ClubPass-${profile.member.roll_number}-QR.png`;
+    a.download = `Infin8Access-${profile.member.roll_number}-QR.png`;
     a.click();
     toast('success', 'QR code downloaded successfully.');
   };
@@ -77,7 +77,7 @@ export default function StudentDashboard() {
       const imgRatio = canvas.height / canvas.width;
       const pdfHeight = pdfWidth * imgRatio;
       pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
-      pdf.save(`ClubPass-${profile.member.roll_number}.pdf`);
+      pdf.save(`Infin8Access-${profile.member.roll_number}.pdf`);
       toast('success', 'PDF downloaded successfully.');
     } catch {
       toast('error', 'Failed to generate PDF.');
@@ -90,9 +90,9 @@ export default function StudentDashboard() {
       const canvas = await html2canvas(clubpassRef.current, { backgroundColor: '#0f172a', scale: 2 });
       const a = document.createElement('a');
       a.href = canvas.toDataURL('image/png');
-      a.download = `ClubPass-${profile.member.roll_number}.png`;
+      a.download = `Infin8Access-${profile.member.roll_number}.png`;
       a.click();
-      toast('success', 'ClubPass image downloaded.');
+      toast('success', 'Infin8 Access image downloaded.');
     } catch {
       toast('error', 'Failed to generate image.');
     }
@@ -107,7 +107,7 @@ export default function StudentDashboard() {
           <h2>${profile?.member?.name}</h2>
           <p>${profile?.member?.roll_number} | ${profile?.member?.member_id}</p>
           <img src="${qrDataUrl}" style="width:300px;height:300px;" />
-          <p style="font-size:12px;color:#666;">ClubPass v1.2</p>
+          <p style="font-size:12px;color:#666;">Infin8 Access v1.2</p>
         </div>
       </body></html>`);
       w.document.close();
@@ -120,7 +120,7 @@ export default function StudentDashboard() {
 
   const tabs = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { key: 'clubpass', label: 'ClubPass', icon: CreditCard },
+    { key: 'clubpass', label: 'Infin8 Access', icon: CreditCard },
     { key: 'permissions', label: 'Permissions', icon: ClipboardList },
     { key: 'profile', label: 'Profile', icon: UserIcon },
   ] as const;
@@ -147,7 +147,7 @@ export default function StudentDashboard() {
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white">ClubPass</h1>
+              <h1 className="text-sm font-bold text-white">Infin8 Access</h1>
               <p className="text-xs text-slate-500">Student Portal</p>
             </div>
           </div>
@@ -215,9 +215,10 @@ export default function StudentDashboard() {
             </div>
 
             {/* Info cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <InfoCard label="Department" value={m.department} />
-              <InfoCard label="Year / Section" value={`Year ${m.year} — ${m.section}`} />
+              <InfoCard label="Year" value={m.year} />
+              <InfoCard label="Section" value={m.section} />
               <InfoCard label="Club" value={m.club} />
               <InfoCard label="Position" value={m.position || 'Member'} />
             </div>
@@ -254,7 +255,7 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-400 uppercase tracking-widest">{collegeName}</p>
-                    <h3 className="text-lg font-bold text-white mt-0.5">ClubPass</h3>
+                    <h3 className="text-lg font-bold text-white mt-0.5">Infin8 Access</h3>
                   </div>
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
                     <Shield className="w-5 h-5 text-white" />
@@ -280,14 +281,18 @@ export default function StudentDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">
                   <div>
                     <p className="text-xs text-slate-500 uppercase">Department</p>
                     <p className="text-sm text-slate-200 mt-0.5">{m.department}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase">Year / Section</p>
-                    <p className="text-sm text-slate-200 mt-0.5">Year {m.year} — {m.section}</p>
+                    <p className="text-xs text-slate-500 uppercase">Year</p>
+                    <p className="text-sm text-slate-200 mt-0.5">{m.year}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase">Section</p>
+                    <p className="text-sm text-slate-200 mt-0.5">{m.section}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 uppercase">Club</p>
@@ -438,7 +443,7 @@ export default function StudentDashboard() {
         )}
 
         {/* Footer */}
-        <p className="text-center text-xs text-slate-600 pb-4">ClubPass v1.2</p>
+        <p className="text-center text-xs text-slate-600 pb-4">Infin8 Access v1.2</p>
       </div>
     </div>
   );

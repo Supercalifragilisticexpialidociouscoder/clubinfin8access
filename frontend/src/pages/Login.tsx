@@ -146,7 +146,7 @@ export default function Login() {
               </button>
             </form>
           </div>
-          <p className="text-center text-xs text-slate-600 mt-6">ClubPass v1.2</p>
+          <p className="text-center text-xs text-slate-600 mt-6">Infin8 Access v1.2</p>
         </div>
       </div>
     );
@@ -167,7 +167,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 mb-4 shadow-lg shadow-blue-500/25">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold gradient-text tracking-tight">ClubPass</h1>
+          <h1 className="text-3xl font-bold gradient-text tracking-tight">Infin8 Access</h1>
           <p className="text-slate-400 mt-2 text-sm">Club Management System</p>
         </div>
 
@@ -239,7 +239,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-6">
-          Malla Reddy Technical Campus &middot; ClubPass v1.2
+          Malla Reddy Technical Campus &middot; Infin8 Access v1.2
         </p>
       </div>
     </div>

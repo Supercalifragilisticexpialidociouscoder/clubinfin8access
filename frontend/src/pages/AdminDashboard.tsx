@@ -303,7 +303,7 @@ export default function AdminDashboard() {
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white">ClubPass Admin</h1>
+              <h1 className="text-sm font-bold text-white">Infin8 Access Admin</h1>
               <p className="text-xs text-slate-500">Administration Panel</p>
             </div>
           </div>
@@ -407,9 +407,6 @@ export default function AdminDashboard() {
                     <tr className="border-b border-white/5">
                       <th className="p-4 w-8"><input type="checkbox" onChange={(e) => { if (e.target.checked) setSelectedMembers(members.map(m => m.uuid)); else setSelectedMembers([]); }} className="rounded" /></th>
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Member</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Roll No</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase hidden md:table-cell">Dept</th>
-                      <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase hidden md:table-cell">Club</th>
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Status</th>
                       <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
                     </tr>
@@ -421,12 +418,9 @@ export default function AdminDashboard() {
                         <td className="p-4">
                           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`/verify/${m.uuid}`)}>
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center text-xs font-bold text-white">{m.full_name?.charAt(0)}</div>
-                            <div><p className="text-white font-medium">{m.full_name}</p><p className="text-xs text-slate-500">{m.member_id}</p></div>
+                            <div><p className="text-white font-medium">{m.full_name}</p><p className="text-xs text-slate-500">{m.roll_number} &middot; {m.department} &middot; Year {m.year} &middot; Section {m.section} &middot; {m.club_name}</p></div>
                           </div>
                         </td>
-                        <td className="p-4 text-slate-300 font-mono text-xs">{m.roll_number}</td>
-                        <td className="p-4 text-slate-400 hidden md:table-cell">{m.department}</td>
-                        <td className="p-4 text-slate-400 hidden md:table-cell">{m.club_name}</td>
                         <td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/15 text-slate-400 border border-slate-500/20'}`}>{m.status || 'active'}</span></td>
                         <td className="p-4">
                           <div className="flex items-center gap-1">
@@ -480,7 +474,7 @@ export default function AdminDashboard() {
                     {permissions.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-500">No permissions found</td></tr>) :
                     permissions.map((p: any) => (
                       <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="p-4"><p className="text-white font-medium">{(p.member_name || '').trim()}</p><p className="text-xs text-slate-500">{p.roll_number} &middot; {p.club_name}</p></td>
+                        <td className="p-4"><p className="text-white font-medium">{(p.member_name || '').trim()}</p><p className="text-xs text-slate-500">{p.roll_number} &middot; {p.department} &middot; Year {p.year} &middot; Section {p.section} &middot; {p.club_name}</p></td>
                         <td className="p-4 text-slate-300 text-xs"><p>{p.date}</p><p className="text-slate-500">{p.time}</p></td>
                         <td className="p-4 text-slate-400 text-xs hidden md:table-cell">{p.purpose || '—'}</td>
                         <td className="p-4 text-slate-400 text-xs hidden md:table-cell">{p.hod_name || '—'}</td>
@@ -710,7 +704,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Footer */}
-        <p className="text-center text-xs text-slate-600 pb-4">ClubPass v1.2</p>
+        <p className="text-center text-xs text-slate-600 pb-4">Infin8 Access v1.2</p>
       </div>
     </div>
   );
@@ -952,7 +946,7 @@ function ViewQRModal({ member, settings, onClose }: { member: any; settings: any
     if (!qrDataUrl) return;
     const a = document.createElement('a');
     a.href = qrDataUrl;
-    a.download = `ClubPass-${member.roll_number || 'QR'}.png`;
+    a.download = `Infin8Access-${member.roll_number || 'QR'}.png`;
     a.click();
   };
 
