@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react';
@@ -40,6 +40,7 @@ export default function Login() {
       if (stored) {
         const user = JSON.parse(stored);
         if (user.role === 'super_admin') navigate('/admin');
+        else if (user.role === 'admin') navigate('/monitoring');
         else if (user.role === 'hod') navigate('/hod');
         else if (user.role === 'coordinator') navigate('/coordinator');
         else if (user.role === 'student') navigate('/student');
@@ -81,55 +82,64 @@ export default function Login() {
     setChangePwLoading(false);
   };
 
+  useEffect(() => {
+    // If already logged in, redirect
+    const stored = localStorage.getItem('clubpass_user');
+    if (stored) {
+      const u = JSON.parse(stored);
+      if (u.role === 'super_admin') navigate('/admin');
+      else if (u.role === 'admin') navigate('/monitoring');
+      else if (u.role === 'hod') navigate('/hod');
+      else if (u.role === 'coordinator') navigate('/coordinator');
+      else if (u.role === 'student') navigate('/student');
+    }
+  }, [navigate]);
+
   // Forced password change screen
   if (showChangePassword) {
     return (
-      <div className="dark min-h-screen gradient-primary flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-purple-500/10 blur-3xl" />
-        </div>
-        <div className="w-full max-w-md relative animate-scale-in">
-          <div className="text-center mb-8 animate-fade-in">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-400 mb-4 shadow-lg shadow-amber-500/25">
-              <Lock className="w-8 h-8 text-white" />
+      <div className="min-h-screen bg-[var(--ia-bg)] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm animate-fade-in">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-amber-500/10 mb-3">
+              <Lock className="w-5 h-5 text-amber-400" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Change Password Required</h1>
-            <p className="text-slate-400 mt-2 text-sm">You must set a new password before continuing.</p>
+            <h1 className="text-lg font-semibold text-[var(--ia-text)]">Change Password Required</h1>
+            <p className="text-[var(--ia-text-muted)] mt-1 text-sm">You must set a new password before continuing.</p>
           </div>
-          <div className="glass-card rounded-2xl p-8 animate-slide-up animation-delay-100">
+          <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg p-6">
             {changePwError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in flex items-center gap-2">
+              <div className="mb-4 p-2.5 rounded-md bg-red-500/8 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {changePwError}
               </div>
             )}
-            <form onSubmit={handleChangePassword} className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">New Password</label>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--ia-text-secondary)]">New Password</label>
                 <input
                   type="password"
                   placeholder="Minimum 12 characters"
                   required
                   value={newPw}
                   onChange={(e) => setNewPw(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                  className="w-full px-3 py-2 rounded-md bg-[var(--ia-input)] border border-[var(--ia-border)] text-[var(--ia-text)] placeholder-[var(--ia-text-muted)] text-sm focus:outline-none focus:border-[var(--ia-accent)] transition-colors"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Confirm New Password</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--ia-text-secondary)]">Confirm New Password</label>
                 <input
                   type="password"
                   placeholder="Re-enter new password"
                   required
                   value={confirmPw}
                   onChange={(e) => setConfirmPw(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                  className="w-full px-3 py-2 rounded-md bg-[var(--ia-input)] border border-[var(--ia-border)] text-[var(--ia-text)] placeholder-[var(--ia-text-muted)] text-sm focus:outline-none focus:border-[var(--ia-accent)] transition-colors"
                 />
               </div>
-              <div className="text-xs text-slate-500 space-y-1">
+              <div className="text-xs text-[var(--ia-text-muted)] space-y-0.5">
                 <p>Password requirements:</p>
-                <ul className="list-disc list-inside space-y-0.5">
+                <ul className="list-disc list-inside space-y-0.5 ml-1">
                   <li>At least 12 characters</li>
                   <li>One uppercase letter</li>
                   <li>One lowercase letter</li>
@@ -140,53 +150,46 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={changePwLoading}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold hover:from-blue-500 hover:to-cyan-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-blue-500/20"
+                className="w-full py-2 px-4 rounded-md bg-[var(--ia-accent)] hover:bg-[var(--ia-accent-hover)] text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ia-accent)]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {changePwLoading ? 'Updating...' : 'Set New Password'}
               </button>
             </form>
           </div>
-          <p className="text-center text-xs text-slate-600 mt-6">Infin8 Access v1.2</p>
+          <p className="text-center text-xs text-[var(--ia-text-muted)] mt-5">Infin8 Access v1.2</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dark min-h-screen gradient-primary flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-purple-500/10 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-cyan-500/5 blur-3xl" />
-      </div>
-
-      <div className="w-full max-w-md relative animate-scale-in">
-        {/* Logo / Brand */}
-        <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 mb-4 shadow-lg shadow-blue-500/25">
-            <ShieldCheck className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-[var(--ia-bg)] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm animate-fade-in">
+        {/* Brand */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--ia-accent)]/10 mb-3">
+            <ShieldCheck className="w-5 h-5 text-[var(--ia-accent)]" />
           </div>
-          <h1 className="text-3xl font-bold gradient-text tracking-tight">Infin8 Access</h1>
-          <p className="text-slate-400 mt-2 text-sm">Club Management System</p>
+          <h1 className="text-xl font-semibold text-[var(--ia-text)] tracking-tight">Infin8 Access</h1>
+          <p className="text-[var(--ia-text-muted)] mt-1 text-sm">Club Management & Permission System</p>
         </div>
 
         {/* Login Card */}
-        <div className="glass-card rounded-2xl p-8 animate-slide-up animation-delay-100">
-          <h2 className="text-xl font-semibold text-white mb-6">Sign in to your account</h2>
+        <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg p-6">
+          <h2 className="text-sm font-semibold text-[var(--ia-text)] mb-5">Sign in to your account</h2>
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in flex items-center gap-2">
+            <div className="mb-4 p-2.5 rounded-md bg-red-500/8 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <label htmlFor="identifier" className="text-sm font-medium text-slate-300">Email or Roll Number</label>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="identifier" className="text-xs font-medium text-[var(--ia-text-secondary)]">Email or Roll Number</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ia-text-muted)]" />
                 <input
                   id="identifier"
                   type="text"
@@ -194,14 +197,14 @@ export default function Login() {
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                  className="w-full pl-9 pr-3 py-2 rounded-md bg-[var(--ia-input)] border border-[var(--ia-border)] text-[var(--ia-text)] placeholder-[var(--ia-text-muted)] text-sm focus:outline-none focus:border-[var(--ia-accent)] transition-colors"
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-slate-300">Password</label>
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-xs font-medium text-[var(--ia-text-secondary)]">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ia-text-muted)]" />
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -209,12 +212,13 @@ export default function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                  className="w-full pl-9 pr-9 py-2 rounded-md bg-[var(--ia-input)] border border-[var(--ia-border)] text-[var(--ia-text)] placeholder-[var(--ia-text-muted)] text-sm focus:outline-none focus:border-[var(--ia-accent)] transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ia-text-muted)] hover:text-[var(--ia-text-secondary)] transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -223,11 +227,11 @@ export default function Login() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold hover:from-blue-500 hover:to-cyan-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-2 px-4 rounded-md bg-[var(--ia-accent)] hover:bg-[var(--ia-accent-hover)] text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ia-accent)]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
@@ -238,7 +242,7 @@ export default function Login() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-6">
+        <p className="text-center text-xs text-[var(--ia-text-muted)] mt-5">
           Malla Reddy Technical Campus &middot; Infin8 Access v1.2
         </p>
       </div>

@@ -25,40 +25,41 @@ export default function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative glass-card rounded-2xl p-6 max-w-sm w-full animate-scale-in">
+      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div className="relative bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg p-5 max-w-sm w-full animate-scale-in shadow-xl">
         <button
           onClick={onCancel}
-          className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+          className="absolute top-3.5 right-3.5 text-[var(--ia-text-muted)] hover:text-[var(--ia-text)] transition-colors"
+          aria-label="Close dialog"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3">
           {variant === 'danger' && (
-            <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
+            <div className="w-9 h-9 rounded-md bg-red-500/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4.5 h-4.5 text-[var(--ia-danger)]" />
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h3 className="text-white font-semibold">{title}</h3>
-            <p className="text-slate-400 text-sm mt-1">{message}</p>
+            <h3 className="text-[var(--ia-text)] font-semibold text-sm">{title}</h3>
+            <p className="text-[var(--ia-text-secondary)] text-sm mt-1">{message}</p>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-2.5 mt-5">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-medium transition-colors"
+            className="flex-1 py-2 rounded-md bg-[var(--ia-elevated)] hover:bg-[var(--ia-border)] text-[var(--ia-text-secondary)] text-sm font-medium transition-colors"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
               variant === 'danger'
-                ? 'bg-red-600 hover:bg-red-500 text-white'
-                : 'bg-blue-600 hover:bg-blue-500 text-white'
+                ? 'bg-[var(--ia-danger)] hover:bg-red-600 text-white'
+                : 'bg-[var(--ia-accent)] hover:bg-[var(--ia-accent-hover)] text-white'
             }`}
           >
             {confirmLabel}

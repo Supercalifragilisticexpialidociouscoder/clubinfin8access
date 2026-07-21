@@ -39,10 +39,10 @@ export function ToastContainer() {
   };
 
   const colors: Record<ToastType, string> = {
-    success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
-    error: 'border-red-500/30 bg-red-500/10 text-red-400',
-    warning: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400',
-    info: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
+    success: 'border-emerald-500/25 bg-emerald-500/8 text-emerald-400',
+    error: 'border-red-500/25 bg-red-500/8 text-red-400',
+    warning: 'border-amber-500/25 bg-amber-500/8 text-amber-400',
+    info: 'border-blue-500/25 bg-blue-500/8 text-blue-400',
   };
 
   return (
@@ -52,13 +52,14 @@ export function ToastContainer() {
         return (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-sm shadow-lg animate-slide-down ${colors[t.type]}`}
+            className={`pointer-events-auto flex items-center gap-2.5 px-3.5 py-2.5 rounded-md border shadow-lg animate-slide-down ${colors[t.type]}`}
           >
             <Icon className="w-4 h-4 shrink-0" />
             <p className="text-sm flex-1">{t.message}</p>
             <button
               onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
               className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+              aria-label="Dismiss notification"
             >
               <X className="w-3.5 h-3.5" />
             </button>

@@ -38,18 +38,19 @@ export default function SearchBar({
 
   return (
     <div className={`relative ${className}`}>
-      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ia-text-muted)]" />
       <input
         type="text"
         placeholder={placeholder}
         value={localValue}
         onChange={(e) => handleChange(e.target.value)}
-        className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+        className="w-full pl-9 pr-8 py-2 rounded-md bg-[var(--ia-input)] border border-[var(--ia-border)] text-[var(--ia-text)] placeholder-[var(--ia-text-muted)] text-sm focus:outline-none focus:border-[var(--ia-accent)] transition-colors"
       />
       {localValue && (
         <button
           onClick={clear}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ia-text-muted)] hover:text-[var(--ia-text)] transition-colors"
+          aria-label="Clear search"
         >
           <X className="w-3.5 h-3.5" />
         </button>

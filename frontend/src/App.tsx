@@ -7,6 +7,7 @@ import VerifyMember from './pages/VerifyMember';
 import HODDashboard from './pages/HODDashboard';
 import CoordinatorDashboard from './pages/CoordinatorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import InstitutionAdminDashboard from './pages/InstitutionAdminDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import { Search } from 'lucide-react';
 
@@ -70,6 +71,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['super_admin']}>
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/monitoring/*"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <InstitutionAdminDashboard />
           </ProtectedRoute>
         }
       />
