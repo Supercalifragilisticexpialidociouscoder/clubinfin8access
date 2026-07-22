@@ -1,0 +1,15 @@
+PRAGMA defer_foreign_keys = TRUE;
+DROP TABLE IF EXISTS student_credentials;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS member_permissions;
+DROP TABLE IF EXISTS permissions;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS faculty_club_assignments;
+DROP TABLE IF EXISTS member_clubs;
+DROP TABLE IF EXISTS members;
+DROP TABLE IF EXISTS clubs;
+DROP TABLE IF EXISTS ClubCoordinators;
+DROP TABLE IF EXISTS d1_migrations;
+DROP TABLE IF EXISTS hods;
+DROP TABLE IF EXISTS admins;

@@ -373,67 +373,83 @@ app.post('/api/auth/login', async (c) => {
     }
 
     // Check student credentials (login with roll number)
-    const studentCred = await c.env.DB.prepare(
-      `SELECT sc.*, m.uuid, m.full_name, m.email as student_email, m.department, m.status, mc.club_id, c.name as club_name
-       FROM student_credentials sc
-       JOIN members m ON sc.member_id = m.id
-       JOIN member_clubs mc ON m.id = mc.member_id
-       JOIN clubs c ON mc.club_id = c.id
-       WHERE sc.username = ?`
+    const studentData = await c.env.DB.prepare(
+      `SELECT sc.password_hash, sc.status as cred_status, sc.locked_until, sc.login_attempts, sc.must_change_password,
+              m.id as member_id, m.uuid, m.full_name, m.email as student_email, m.department, m.status as member_status, m.roll_number,
+              mc.club_id, c.name as club_name
+       FROM members m
+       LEFT JOIN student_credentials sc ON m.id = sc.member_id
+       LEFT JOIN member_clubs mc ON m.id = mc.member_id
+       LEFT JOIN clubs c ON mc.club_id = c.id
+       WHERE m.roll_number = ? AND m.member_type = 'student'`
     ).bind(identifier).first()
-    if (studentCred) {
-      if (studentCred.status === 'suspended') {
+    
+    if (studentData) {
+      if (studentData.member_status === 'suspended' || studentData.cred_status === 'suspended') {
         return c.json({ error: 'Account has been suspended. Contact the administrator.' }, 403)
       }
-      if (studentCred.status === 'archived' || studentCred.status === 'graduated') {
+      if (studentData.member_status === 'archived' || studentData.member_status === 'graduated') {
         return c.json({ error: 'Account is no longer active.' }, 403)
       }
       // Check lockout
-      if (studentCred.locked_until) {
-        const lockTime = new Date(studentCred.locked_until as string).getTime()
+      if (studentData.locked_until) {
+        const lockTime = new Date(studentData.locked_until as string).getTime()
         if (Date.now() < lockTime) {
           return c.json({ error: 'Account temporarily locked. Try again later.' }, 423)
         }
-        await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = 0, locked_until = NULL WHERE member_id = ?').bind(studentCred.member_id).run()
+        await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = 0, locked_until = NULL WHERE member_id = ?').bind(studentData.member_id).run()
       }
 
-      const valid = await verifyPassword(password, studentCred.password_hash as string)
+      let valid = false;
+      if (studentData.password_hash) {
+        valid = await verifyPassword(password, studentData.password_hash as string)
+      } else {
+        // Auto-migrate: If they don't have credentials yet, the default password is the roll number.
+        if (password === studentData.roll_number) {
+          valid = true;
+          const tempPasswordHash = await hashPassword(studentData.roll_number as string)
+          await c.env.DB.prepare(
+            'INSERT OR IGNORE INTO student_credentials (member_id, username, password_hash, must_change_password) VALUES (?, ?, ?, 0)'
+          ).bind(studentData.member_id, studentData.roll_number, tempPasswordHash).run()
+        }
+      }
+
       if (valid) {
         await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = 0, locked_until = NULL, last_login = ? WHERE member_id = ?')
-          .bind(new Date().toISOString(), studentCred.member_id).run()
+          .bind(new Date().toISOString(), studentData.member_id).run()
         const tokenPayload = {
-          id: studentCred.uuid || String(studentCred.member_id),
-          name: (studentCred.full_name as string)?.trim(),
-          email: studentCred.student_email || identifier,
+          id: studentData.uuid || String(studentData.member_id),
+          name: (studentData.full_name as string)?.trim(),
+          email: studentData.student_email || identifier,
           role: 'student',
-          department: studentCred.department,
-          club_id: String(studentCred.club_id),
-          club_name: studentCred.club_name,
-          must_change_password: studentCred.must_change_password === 1,
+          department: studentData.department,
+          club_id: studentData.club_id ? String(studentData.club_id) : '',
+          club_name: studentData.club_name || '',
+          must_change_password: studentData.must_change_password === 1,
           exp: Math.floor(Date.now() / 1000) + 86400
         }
         const token = await signJWT(tokenPayload, secret)
-        await createAuditLog(c.env.DB, String(studentCred.member_id), 'student', 'LOGIN', `Student login: ${identifier}`)
+        await createAuditLog(c.env.DB, String(studentData.member_id), 'student', 'LOGIN', `Student login: ${identifier}`)
         return c.json({
           token,
           user: {
-            id: studentCred.uuid || String(studentCred.member_id),
-            name: (studentCred.full_name as string)?.trim(),
-            email: studentCred.student_email || identifier,
+            id: studentData.uuid || String(studentData.member_id),
+            name: (studentData.full_name as string)?.trim(),
+            email: studentData.student_email || identifier,
             role: 'student',
-            department: studentCred.department,
-            club_id: String(studentCred.club_id),
-            club_name: studentCred.club_name,
+            department: studentData.department,
+            club_id: studentData.club_id ? String(studentData.club_id) : '',
+            club_name: studentData.club_name || '',
           },
-          must_change_password: studentCred.must_change_password === 1,
+          must_change_password: studentData.must_change_password === 1,
         })
       } else {
-        const attempts = ((studentCred.login_attempts as number) || 0) + 1
+        const attempts = ((studentData.login_attempts as number) || 0) + 1
         if (attempts >= 5) {
           const lockUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString()
-          await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = ?, locked_until = ? WHERE member_id = ?').bind(attempts, lockUntil, studentCred.member_id).run()
-        } else {
-          await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = ? WHERE member_id = ?').bind(attempts, studentCred.member_id).run()
+          await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = ?, locked_until = ? WHERE member_id = ?').bind(attempts, lockUntil, studentData.member_id).run()
+        } else if (studentData.password_hash) {
+          await c.env.DB.prepare('UPDATE student_credentials SET login_attempts = ? WHERE member_id = ?').bind(attempts, studentData.member_id).run()
         }
       }
     }
@@ -1289,7 +1305,9 @@ app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin',
       } else if (target_audience === 'all_hods') {
         recipientQuery = "SELECT id, 'hod' as role FROM hods"
       } else if (target_audience === 'all_coordinators') {
-        recipientQuery = "SELECT faculty_member_id as id, 'coordinator' as role FROM faculty_club_assignments GROUP BY faculty_member_id"
+        recipientQuery = `SELECT faculty_member_id as id, 'coordinator' as role FROM faculty_club_assignments GROUP BY faculty_member_id
+                          UNION
+                          SELECT id, 'coordinator' as role FROM coordinator_credentials`
       } else if (target_audience === 'club') {
         if (!club_id) return c.json({ error: 'club_id required' }, 400)
         recipientQuery = "SELECT member_id as id, 'student' as role FROM member_clubs WHERE club_id = ?"
@@ -1299,7 +1317,11 @@ app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin',
         recipientQuery = "SELECT id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')"
         queryParams.push(department)
       } else if (target_audience === 'all') {
-        recipientQuery = "SELECT id, 'student' as role FROM members WHERE status IN ('active', 'inactive') UNION SELECT id, 'hod' as role FROM hods"
+        recipientQuery = `SELECT id, 'student' as role FROM members WHERE status IN ('active', 'inactive')
+                          UNION SELECT id, 'hod' as role FROM hods
+                          UNION SELECT id, role FROM admins WHERE role IN ('institution_admin', 'super_admin')
+                          UNION SELECT faculty_member_id as id, 'coordinator' as role FROM faculty_club_assignments GROUP BY faculty_member_id
+                          UNION SELECT id, 'coordinator' as role FROM coordinator_credentials`
       } else {
         return c.json({ error: 'Invalid target_audience' }, 400)
       }

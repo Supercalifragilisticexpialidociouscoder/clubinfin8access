@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from './components/Toast';
+import { useDeviceNotifications } from './hooks/useDeviceNotifications';
 import Login from './pages/Login';
 import VerifyMember from './pages/VerifyMember';
 import HODDashboard from './pages/HODDashboard';
@@ -10,6 +11,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import InstitutionAdminDashboard from './pages/InstitutionAdminDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import { Search } from 'lucide-react';
+
+function DeviceNotificationManager() {
+  useDeviceNotifications();
+  return null;
+}
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -116,6 +122,7 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
+      <DeviceNotificationManager />
       <HashRouter>
         <ToastContainer />
         <AppRoutes />

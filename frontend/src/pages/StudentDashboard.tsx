@@ -1,7 +1,6 @@
 import { formatYear } from '../utils/formatters';
 import { useEffect, useState, useRef } from 'react';
 import ISTTime from '../components/ISTTime';
-import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
@@ -9,18 +8,15 @@ import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
-  LayoutDashboard, CreditCard, ClipboardList, User as UserIcon,
-  Download, Maximize2, Printer, QrCode, LogOut, Clock, CheckCircle2,
-  XCircle, AlertTriangle, Calendar, FileText, MessageSquare, Shield, Bell
+  LayoutDashboard, CreditCard,
+  Download, Maximize2, Printer, QrCode, LogOut, Shield
 } from 'lucide-react';
 
 export default function StudentDashboard() {
   const { user, logout, apiCall } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'clubpass'>('overview');
   const [profile, setProfile] = useState<any>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [showFullscreenQR, setShowFullscreenQR] = useState(false);
   const [settings, setSettings] = useState<any>({});
@@ -29,7 +25,6 @@ export default function StudentDashboard() {
   useEffect(() => {
     loadProfile();
     loadSettings();
-    loadNotifications();
   }, []);
 
   const loadProfile = async () => {
@@ -41,23 +36,6 @@ export default function StudentDashboard() {
         generateQR(data.member.uuid);
       }
     } catch { }
-  };
-
-  const loadNotifications = async () => {
-    try {
-      const res = await apiCall('/api/notifications');
-      if (res.ok) {
-        const d = await res.json();
-        setNotifications(d.notifications || []);
-        setUnreadCount(d.unread_count || 0);
-      }
-    } catch { }
-  };
-
-  const markAllRead = async () => {
-    await apiCall('/api/notifications/read-all', { method: 'PATCH' });
-    setUnreadCount(0);
-    setNotifications(prev => prev.map(n => ({ ...n, read_status: 1 })));
   };
 
   const loadSettings = async () => {
@@ -144,9 +122,6 @@ export default function StudentDashboard() {
   const tabs = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'clubpass', label: 'Infin8 Access', icon: CreditCard },
-    { key: 'permissions', label: 'Permissions', icon: ClipboardList },
-    { key: 'profile', label: 'Profile', icon: UserIcon },
-    { key: 'notifications', label: 'Alerts', icon: Bell },
   ] as const;
 
   return (
@@ -210,9 +185,6 @@ export default function StudentDashboard() {
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{tab.label}</span>
-                {tab.key === 'notifications' && unreadCount > 0 && (
-                  <span className="ml-1.5 bg-[var(--ia-accent)] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
-                )}
               </button>
             );
           })}
@@ -352,154 +324,6 @@ export default function StudentDashboard() {
               <ActionButton icon={Download} label="Save Card" onClick={downloadPNG} />
               <ActionButton icon={Printer} label="Print" onClick={printQR} />
             </div>
-          </div>
-        )}
-
-        {/* Permissions Tab */}
-        {activeTab === 'permissions' && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-[var(--ia-border)] bg-[var(--ia-elevated)]">
-                <h3 className="font-semibold text-sm text-[var(--ia-text)]">Permission History</h3>
-              </div>
-              {!profile?.permissions?.length ? (
-                <p className="px-4 py-8 text-center text-[var(--ia-text-muted)] text-sm">No permission records found.</p>
-              ) : (
-                <div className="divide-y divide-[var(--ia-border)] max-h-[60vh] overflow-y-auto">
-                  {profile.permissions.map((p: any) => {
-                    const isActive = p.effective_status === 'active';
-                    const isClosed = p.effective_status === 'closed' || p.effective_status === 'completed';
-                    const isExpired = p.effective_status === 'expired';
-                    const isRejected = p.effective_status === 'rejected';
-
-                    // Simplify overdue display utilizing the existing effective_status
-                    let displayStatus = 'Granted';
-                    let statusColor = 'text-[var(--ia-success)]';
-                    let bgStatusColor = 'bg-[var(--ia-success)]/15';
-
-                    if (isActive) {
-                      displayStatus = 'Active Permission';
-                    } else if (isClosed) {
-                      displayStatus = 'Closed';
-                      statusColor = 'text-[var(--ia-info)]';
-                      bgStatusColor = 'bg-[var(--ia-info)]/15';
-                    } else if (isExpired) {
-                      displayStatus = 'Expired';
-                      statusColor = 'text-[var(--ia-danger)]';
-                      bgStatusColor = 'bg-[var(--ia-danger)]/15';
-                    } else if (isRejected) {
-                      displayStatus = 'Rejected';
-                      statusColor = 'text-[var(--ia-danger)]';
-                      bgStatusColor = 'bg-[var(--ia-danger)]/15';
-                    }
-
-                    return (
-                      <div key={p.id} className="px-4 py-3 hover:bg-[var(--ia-elevated)] transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-md flex items-center justify-center ${bgStatusColor}`}>
-                              {isClosed ? <CheckCircle2 className={`w-4 h-4 ${statusColor}`} /> : isRejected ? <XCircle className={`w-4 h-4 ${statusColor}`} /> : isActive ? <Clock className={`w-4 h-4 ${statusColor}`} /> : <CheckCircle2 className={`w-4 h-4 ${statusColor}`} />}
-                            </div>
-                            <div>
-                              <p className={`text-[13px] font-medium ${statusColor}`}>
-                                {displayStatus}
-                              </p>
-                              <p className="text-[11px] text-[var(--ia-text-muted)]">{p.date} at {p.approved_at ? formatISTTime(p.approved_at) : p.time}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            {isActive && p.expected_return_time && (
-                              <PermissionTimer 
-                                expectedReturnTime={p.expected_return_time}
-                                grantedTime={p.approved_at || p.time} 
-                              />
-                            )}
-                            {isExpired && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--ia-danger)]/15 text-[var(--ia-danger)] border border-[var(--ia-danger)]/25 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" /> EXPIRED
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {(p.purpose || p.remark || p.expected_return_time) && (
-                          <div className="mt-2 ml-11 space-y-0.5 text-xs">
-                            {p.purpose && <p className="text-[var(--ia-text-secondary)]"><span className="text-[var(--ia-text-muted)]">Purpose:</span> {p.purpose}</p>}
-                            {p.remark && <p className="text-[var(--ia-text-secondary)]"><span className="text-[var(--ia-text-muted)]">Remark:</span> {p.remark}</p>}
-                            {p.expected_return_time && <p className="text-[var(--ia-text-secondary)]"><span className="text-[var(--ia-text-muted)]">Expected Return:</span> {p.expected_return_time}</p>}
-                            {p.hod_name && <p className="text-[var(--ia-text-secondary)]"><span className="text-[var(--ia-text-muted)]">Approved By:</span> {p.hod_name}</p>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Notifications Tab */}
-        {activeTab === 'notifications' && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-[var(--ia-border)] bg-[var(--ia-elevated)] flex justify-between items-center">
-                <h3 className="font-semibold text-sm text-[var(--ia-text)]">Notification Center</h3>
-                {unreadCount > 0 && <button onClick={markAllRead} className="text-xs text-[var(--ia-accent)] hover:text-blue-400 font-medium">Mark all as read</button>}
-              </div>
-              <div className="divide-y divide-[var(--ia-border)] max-h-[60vh] overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full py-12 opacity-50">
-                    <Bell className="w-12 h-12 mb-3 text-[var(--ia-text-muted)]" />
-                    <p className="text-sm font-medium text-[var(--ia-text)]">No notifications</p>
-                  </div>
-                ) : notifications.map((n: any) => (
-                  <div key={n.id} className={`px-4 py-3 hover:bg-[var(--ia-elevated)] transition-colors ${n.read_status === 0 ? 'bg-[var(--ia-accent)]/5' : ''}`}>
-                    <p className="text-sm text-[var(--ia-text)] font-medium">{n.title}</p>
-                    <p className="text-[13px] text-[var(--ia-text-secondary)] mt-0.5 whitespace-pre-wrap">{n.message}</p>
-                    <p className="text-[11px] text-[var(--ia-text-muted)] mt-1">{new Date(n.created_at).toLocaleString()}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Profile Tab */}
-        {activeTab === 'profile' && m && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg p-5">
-              <h3 className="font-semibold text-sm text-[var(--ia-text)] mb-3">Member Information</h3>
-              <div className="grid grid-cols-2 gap-y-4 gap-x-2">
-                <ProfileField label="Full Name" value={m.name} />
-                <ProfileField label="Roll Number" value={m.roll_number} />
-                <ProfileField label="Member ID" value={m.member_id} />
-                <ProfileField label="Email" value={m.email || 'N/A'} />
-                <ProfileField label="Department" value={m.department} />
-                <ProfileField label="Year" value={formatYear(m.year)} />
-                <ProfileField label="Section" value={m.section} />
-                <ProfileField label="Club" value={m.club} />
-                <ProfileField label="Position" value={m.position || 'Member'} />
-                <ProfileField label="Status" value={m.status} />
-              </div>
-            </div>
-
-            {/* Activity Timeline */}
-            {profile.activities?.length > 0 && (
-              <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg p-5">
-                <h3 className="font-semibold text-sm text-[var(--ia-text)] mb-3">Activity Timeline</h3>
-                <div className="space-y-3 max-h-[40vh] overflow-y-auto">
-                  {profile.activities.map((a: any, i: number) => (
-                    <div key={a.id || i} className="flex items-start gap-2.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--ia-info)] mt-1.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] text-[var(--ia-text-secondary)] line-clamp-2">{a.details}</p>
-                        <p className="text-[11px] text-[var(--ia-text-muted)] mt-0.5">{new Date(a.created_at).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 

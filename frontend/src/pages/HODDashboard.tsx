@@ -246,6 +246,17 @@ export default function HODDashboard() {
   };
   const onScanFailure = () => {};
 
+  const calculateOverdue = (expectedTime: string) => {
+    if (!expectedTime) return 0;
+    const nowIST = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric', minute: 'numeric' });
+    const [nowH, nowM] = nowIST.split(':').map(Number);
+    const [expH, expM] = expectedTime.split(':').map(Number);
+    const nowMins = nowH * 60 + nowM;
+    const expMins = expH * 60 + expM;
+    const overdueMins = nowMins - expMins;
+    return overdueMins > 0 ? overdueMins : 0;
+  };
+
   const fetchScannedData = async (uuid: string) => {
     setScanLoading(true);
     try {

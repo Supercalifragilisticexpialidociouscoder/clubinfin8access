@@ -29,16 +29,17 @@ export default function Login() {
     const result = await login(identifier, password);
 
     if (result.success) {
-      if (result.must_change_password) {
+      const stored = localStorage.getItem('clubpass_user');
+      const user = stored ? JSON.parse(stored) : null;
+
+      if (result.must_change_password && user?.role !== 'student') {
         setShowChangePassword(true);
         setCurrentPw(password);
         setIsLoading(false);
         return;
       }
 
-      const stored = localStorage.getItem('clubpass_user');
-      if (stored) {
-        const user = JSON.parse(stored);
+      if (user) {
         if (user.role === 'super_admin') navigate('/admin');
         else if (user.role === 'admin') navigate('/monitoring');
         else if (user.role === 'hod') navigate('/hod');

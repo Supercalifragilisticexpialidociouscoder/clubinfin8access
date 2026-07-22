@@ -37,9 +37,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// .wrangler/tmp/bundle-V3Twlb/checked-fetch.js
+// .wrangler/tmp/bundle-5BJm30/checked-fetch.js
 var require_checked_fetch = __commonJS({
-  ".wrangler/tmp/bundle-V3Twlb/checked-fetch.js"() {
+  ".wrangler/tmp/bundle-5BJm30/checked-fetch.js"() {
     "use strict";
     var urls = /* @__PURE__ */ new Set();
     function checkURL(request, init) {
@@ -92,11 +92,11 @@ var require_crypto = __commonJS({
   }
 });
 
-// .wrangler/tmp/bundle-V3Twlb/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-5BJm30/middleware-loader.entry.ts
 var import_checked_fetch35 = __toESM(require_checked_fetch());
 init_modules_watch_stub();
 
-// .wrangler/tmp/bundle-V3Twlb/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-5BJm30/middleware-insertion-facade.js
 var import_checked_fetch33 = __toESM(require_checked_fetch());
 init_modules_watch_stub();
 
@@ -4169,6 +4169,35 @@ var bcryptjs_default = {
 };
 
 // src/index.ts
+function getISTDate() {
+  return (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+}
+__name(getISTDate, "getISTDate");
+function getISTTimeHM() {
+  const d = /* @__PURE__ */ new Date();
+  const utc = d.getTime() + d.getTimezoneOffset() * 6e4;
+  const nd = new Date(utc + 36e5 * 5.5);
+  return `${nd.getHours().toString().padStart(2, "0")}:${nd.getMinutes().toString().padStart(2, "0")}`;
+}
+__name(getISTTimeHM, "getISTTimeHM");
+function computeEffectiveStatus(p, currentDate, currentHM) {
+  if (!p) return null;
+  if (p.status === "closed" || p.status === "rejected") return p.status;
+  if (p.status === "granted") {
+    if (p.date < currentDate) return "expired";
+    if (p.date === currentDate) {
+      if (currentHM >= "16:00") return "expired";
+      if (p.expected_return_time && currentHM >= p.expected_return_time) return "expired";
+    }
+    return "active";
+  }
+  return p.status;
+}
+__name(computeEffectiveStatus, "computeEffectiveStatus");
+function getUTCDateTime() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+__name(getUTCDateTime, "getUTCDateTime");
 function base64UrlEncode(str) {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -4234,6 +4263,10 @@ async function createNotification(db, recipientId, recipientRole, type, title, m
   ).bind(id, recipientId, recipientRole, type, title, message, relatedMemberUuid || null).run();
 }
 __name(createNotification, "createNotification");
+async function hashPassword(password) {
+  return bcryptjs_default.hashSync(password, 10);
+}
+__name(hashPassword, "hashPassword");
 async function verifyPassword(password, storedHash) {
   if (storedHash.startsWith("$2")) {
     return bcryptjs_default.compareSync(password, storedHash);
@@ -4244,13 +4277,26 @@ async function verifyPassword(password, storedHash) {
   return hex === storedHash || password === storedHash;
 }
 __name(verifyPassword, "verifyPassword");
+function validatePassword(password) {
+  if (password.length < 12) return "Password must be at least 12 characters";
+  if (!/[A-Z]/.test(password)) return "Password must contain an uppercase letter";
+  if (!/[a-z]/.test(password)) return "Password must contain a lowercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain a number";
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) return "Password must contain a special character";
+  return null;
+}
+__name(validatePassword, "validatePassword");
+function formatMemberId(id) {
+  return `CLB-${String(id).padStart(6, "0")}`;
+}
+__name(formatMemberId, "formatMemberId");
 var app = new Hono2();
 app.use("*", cors({
   origin: "*",
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowHeaders: ["Content-Type", "Authorization"]
 }));
-app.get("/", (c) => c.json({ status: "ok", service: "ClubPass API" }));
+app.get("/", (c) => c.json({ status: "ok", service: "ClubPass API", version: "1.2" }));
 app.post("/api/auth/login", async (c) => {
   try {
     const { email, password } = await c.req.json();
@@ -4258,27 +4304,55 @@ app.post("/api/auth/login", async (c) => {
       return c.json({ error: "Email and password are required" }, 400);
     }
     const secret = c.env.JWT_SECRET || "clubpass-secret-key-2024";
-    const admin = await c.env.DB.prepare("SELECT * FROM admins WHERE email = ?").bind(email).first();
+    const identifier = email.trim();
+    const admin = await c.env.DB.prepare("SELECT * FROM admins WHERE email = ?").bind(identifier).first();
     if (admin) {
+      if (admin.locked_until) {
+        const lockTime = new Date(admin.locked_until).getTime();
+        if (Date.now() < lockTime) {
+          return c.json({ error: "Account temporarily locked. Try again later." }, 423);
+        }
+        await c.env.DB.prepare("UPDATE admins SET login_attempts = 0, locked_until = NULL WHERE id = ?").bind(admin.id).run();
+      }
       const valid = await verifyPassword(password, admin.password_hash);
       if (valid) {
+        await c.env.DB.prepare("UPDATE admins SET login_attempts = 0, locked_until = NULL WHERE id = ?").bind(admin.id).run();
         const tokenPayload = {
           id: admin.id,
           name: admin.name || "Admin",
           email: admin.email,
-          role: "super_admin",
+          role: admin.role || "super_admin",
           exp: Math.floor(Date.now() / 1e3) + 86400
           // 24h
         };
         const token = await signJWT(tokenPayload, secret);
-        await createAuditLog(c.env.DB, admin.id, "super_admin", "LOGIN", `Admin login: ${email}`);
-        return c.json({ token, user: { id: admin.id, name: admin.name || "Admin", email: admin.email, role: "super_admin" } });
+        await createAuditLog(c.env.DB, admin.id, "super_admin", "LOGIN", `Admin login: ${identifier}`);
+        return c.json({ token, user: { id: admin.id, name: admin.name || "Admin", email: admin.email, role: admin.role || "super_admin" } });
+      } else {
+        const attempts = (admin.login_attempts || 0) + 1;
+        if (attempts >= 5) {
+          const lockUntil = new Date(Date.now() + 15 * 60 * 1e3).toISOString();
+          await c.env.DB.prepare("UPDATE admins SET login_attempts = ?, locked_until = ? WHERE id = ?").bind(attempts, lockUntil, admin.id).run();
+        } else {
+          await c.env.DB.prepare("UPDATE admins SET login_attempts = ? WHERE id = ?").bind(attempts, admin.id).run();
+        }
       }
     }
-    const hod = await c.env.DB.prepare("SELECT * FROM hods WHERE email = ?").bind(email).first();
+    const hod = await c.env.DB.prepare("SELECT * FROM hods WHERE email = ?").bind(identifier).first();
     if (hod) {
+      if (hod.status === "disabled") {
+        return c.json({ error: "Account has been disabled. Contact the administrator." }, 403);
+      }
+      if (hod.locked_until) {
+        const lockTime = new Date(hod.locked_until).getTime();
+        if (Date.now() < lockTime) {
+          return c.json({ error: "Account temporarily locked. Try again later." }, 423);
+        }
+        await c.env.DB.prepare("UPDATE hods SET login_attempts = 0, locked_until = NULL WHERE id = ?").bind(hod.id).run();
+      }
       const valid = await verifyPassword(password, hod.password_hash);
       if (valid) {
+        await c.env.DB.prepare("UPDATE hods SET login_attempts = 0, locked_until = NULL WHERE id = ?").bind(hod.id).run();
         const tokenPayload = {
           id: hod.id,
           name: hod.name,
@@ -4288,8 +4362,61 @@ app.post("/api/auth/login", async (c) => {
           exp: Math.floor(Date.now() / 1e3) + 86400
         };
         const token = await signJWT(tokenPayload, secret);
-        await createAuditLog(c.env.DB, hod.id, "hod", "LOGIN", `HOD login: ${email}`);
+        await createAuditLog(c.env.DB, hod.id, "hod", "LOGIN", `HOD login: ${identifier}`);
         return c.json({ token, user: { id: hod.id, name: hod.name, email: hod.email, role: "hod", department: hod.department } });
+      } else {
+        const attempts = (hod.login_attempts || 0) + 1;
+        if (attempts >= 5) {
+          const lockUntil = new Date(Date.now() + 15 * 60 * 1e3).toISOString();
+          await c.env.DB.prepare("UPDATE hods SET login_attempts = ?, locked_until = ? WHERE id = ?").bind(attempts, lockUntil, hod.id).run();
+        } else {
+          await c.env.DB.prepare("UPDATE hods SET login_attempts = ? WHERE id = ?").bind(attempts, hod.id).run();
+        }
+      }
+    }
+    const clubCoord = await c.env.DB.prepare(
+      `SELECT cc.*, c.name as club_name
+       FROM coordinator_credentials cc
+       JOIN clubs c ON cc.club_id = c.id
+       WHERE cc.email = ?`
+    ).bind(identifier).first();
+    console.log("Login attempt for coord:", identifier, "found:", !!clubCoord);
+    if (clubCoord) {
+      if (clubCoord.status === "disabled") {
+        return c.json({ error: "Account has been disabled. Contact the administrator." }, 403);
+      }
+      if (clubCoord.locked_until) {
+        const lockTime = new Date(clubCoord.locked_until).getTime();
+        if (Date.now() < lockTime) {
+          return c.json({ error: "Account temporarily locked. Try again later." }, 423);
+        }
+        await c.env.DB.prepare("UPDATE coordinator_credentials SET login_attempts = 0, locked_until = NULL WHERE id = ?").bind(clubCoord.id).run();
+      }
+      console.log("Verifying password:", password, "against hash:", clubCoord.password_hash);
+      const valid = await verifyPassword(password, clubCoord.password_hash);
+      console.log("Verify password result:", valid);
+      if (valid) {
+        await c.env.DB.prepare("UPDATE coordinator_credentials SET login_attempts = 0, locked_until = NULL WHERE id = ?").bind(clubCoord.id).run();
+        const tokenPayload = {
+          id: clubCoord.id,
+          name: clubCoord.club_name + " Coordinator",
+          email: clubCoord.email,
+          role: "coordinator",
+          club_id: String(clubCoord.club_id),
+          club_name: clubCoord.club_name,
+          exp: Math.floor(Date.now() / 1e3) + 86400
+        };
+        const token = await signJWT(tokenPayload, secret);
+        await createAuditLog(c.env.DB, clubCoord.id, "coordinator", "LOGIN", `Club Coordinator login: ${identifier}`);
+        return c.json({ token, user: { id: clubCoord.id, name: tokenPayload.name, email: clubCoord.email, role: "coordinator", club_id: String(clubCoord.club_id), club_name: clubCoord.club_name } });
+      } else {
+        const attempts = (clubCoord.login_attempts || 0) + 1;
+        if (attempts >= 5) {
+          const lockUntil = new Date(Date.now() + 15 * 60 * 1e3).toISOString();
+          await c.env.DB.prepare("UPDATE coordinator_credentials SET login_attempts = ?, locked_until = ? WHERE id = ?").bind(attempts, lockUntil, clubCoord.id).run();
+        } else {
+          await c.env.DB.prepare("UPDATE coordinator_credentials SET login_attempts = ? WHERE id = ?").bind(attempts, clubCoord.id).run();
+        }
       }
     }
     const faculty = await c.env.DB.prepare(
@@ -4298,7 +4425,7 @@ app.post("/api/auth/login", async (c) => {
        JOIN member_clubs mc ON m.id = mc.member_id 
        JOIN clubs c ON mc.club_id = c.id
        WHERE m.email = ? AND m.member_type = 'faculty'`
-    ).bind(email).first();
+    ).bind(identifier).first();
     if (faculty) {
       const valid = await verifyPassword(password, faculty.phone || "");
       if (valid) {
@@ -4312,13 +4439,117 @@ app.post("/api/auth/login", async (c) => {
           exp: Math.floor(Date.now() / 1e3) + 86400
         };
         const token = await signJWT(tokenPayload, secret);
-        await createAuditLog(c.env.DB, String(faculty.id), "coordinator", "LOGIN", `Coordinator login: ${email}`);
+        await createAuditLog(c.env.DB, String(faculty.id), "coordinator", "LOGIN", `Coordinator login: ${identifier}`);
         return c.json({ token, user: { id: faculty.uuid || String(faculty.id), name: faculty.full_name, email: faculty.email, role: "coordinator", club_id: String(faculty.club_id), club_name: faculty.club_name } });
+      }
+    }
+    const studentData = await c.env.DB.prepare(
+      `SELECT sc.password_hash, sc.status as cred_status, sc.locked_until, sc.login_attempts, sc.must_change_password,
+              m.id as member_id, m.uuid, m.full_name, m.email as student_email, m.department, m.status as member_status, m.roll_number,
+              mc.club_id, c.name as club_name
+       FROM members m
+       LEFT JOIN student_credentials sc ON m.id = sc.member_id
+       LEFT JOIN member_clubs mc ON m.id = mc.member_id
+       LEFT JOIN clubs c ON mc.club_id = c.id
+       WHERE m.roll_number = ? AND m.member_type = 'student'`
+    ).bind(identifier).first();
+    if (studentData) {
+      if (studentData.member_status === "suspended" || studentData.cred_status === "suspended") {
+        return c.json({ error: "Account has been suspended. Contact the administrator." }, 403);
+      }
+      if (studentData.member_status === "archived" || studentData.member_status === "graduated") {
+        return c.json({ error: "Account is no longer active." }, 403);
+      }
+      if (studentData.locked_until) {
+        const lockTime = new Date(studentData.locked_until).getTime();
+        if (Date.now() < lockTime) {
+          return c.json({ error: "Account temporarily locked. Try again later." }, 423);
+        }
+        await c.env.DB.prepare("UPDATE student_credentials SET login_attempts = 0, locked_until = NULL WHERE member_id = ?").bind(studentData.member_id).run();
+      }
+      let valid = false;
+      if (studentData.password_hash) {
+        valid = await verifyPassword(password, studentData.password_hash);
+      } else {
+        if (password === studentData.roll_number) {
+          valid = true;
+          const tempPasswordHash = await hashPassword(studentData.roll_number);
+          await c.env.DB.prepare(
+            "INSERT OR IGNORE INTO student_credentials (member_id, username, password_hash, must_change_password) VALUES (?, ?, ?, 0)"
+          ).bind(studentData.member_id, studentData.roll_number, tempPasswordHash).run();
+        }
+      }
+      if (valid) {
+        await c.env.DB.prepare("UPDATE student_credentials SET login_attempts = 0, locked_until = NULL, last_login = ? WHERE member_id = ?").bind((/* @__PURE__ */ new Date()).toISOString(), studentData.member_id).run();
+        const tokenPayload = {
+          id: studentData.uuid || String(studentData.member_id),
+          name: studentData.full_name?.trim(),
+          email: studentData.student_email || identifier,
+          role: "student",
+          department: studentData.department,
+          club_id: studentData.club_id ? String(studentData.club_id) : "",
+          club_name: studentData.club_name || "",
+          must_change_password: studentData.must_change_password === 1,
+          exp: Math.floor(Date.now() / 1e3) + 86400
+        };
+        const token = await signJWT(tokenPayload, secret);
+        await createAuditLog(c.env.DB, String(studentData.member_id), "student", "LOGIN", `Student login: ${identifier}`);
+        return c.json({
+          token,
+          user: {
+            id: studentData.uuid || String(studentData.member_id),
+            name: studentData.full_name?.trim(),
+            email: studentData.student_email || identifier,
+            role: "student",
+            department: studentData.department,
+            club_id: studentData.club_id ? String(studentData.club_id) : "",
+            club_name: studentData.club_name || ""
+          },
+          must_change_password: studentData.must_change_password === 1
+        });
+      } else {
+        const attempts = (studentData.login_attempts || 0) + 1;
+        if (attempts >= 5) {
+          const lockUntil = new Date(Date.now() + 15 * 60 * 1e3).toISOString();
+          await c.env.DB.prepare("UPDATE student_credentials SET login_attempts = ?, locked_until = ? WHERE member_id = ?").bind(attempts, lockUntil, studentData.member_id).run();
+        } else if (studentData.password_hash) {
+          await c.env.DB.prepare("UPDATE student_credentials SET login_attempts = ? WHERE member_id = ?").bind(attempts, studentData.member_id).run();
+        }
       }
     }
     return c.json({ error: "Invalid credentials" }, 401);
   } catch (e) {
     return c.json({ error: "Login failed", details: e.message }, 500);
+  }
+});
+app.post("/api/auth/change-password", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  const token = authHeader.slice(7);
+  const secret = c.env.JWT_SECRET || "clubpass-secret-key-2024";
+  const payload = await verifyJWT(token, secret);
+  if (!payload) return c.json({ error: "Invalid token" }, 401);
+  try {
+    const { current_password, new_password } = await c.req.json();
+    if (!current_password || !new_password) {
+      return c.json({ error: "Current password and new password are required" }, 400);
+    }
+    const pwError = validatePassword(new_password);
+    if (pwError) return c.json({ error: pwError }, 400);
+    const member = await c.env.DB.prepare("SELECT id FROM members WHERE uuid = ?").bind(payload.id).first();
+    if (!member) return c.json({ error: "User not found" }, 404);
+    const cred = await c.env.DB.prepare("SELECT * FROM student_credentials WHERE member_id = ?").bind(member.id).first();
+    if (!cred) return c.json({ error: "No credentials found" }, 404);
+    const valid = await verifyPassword(current_password, cred.password_hash);
+    if (!valid) return c.json({ error: "Current password is incorrect" }, 401);
+    const newHash = await hashPassword(new_password);
+    await c.env.DB.prepare("UPDATE student_credentials SET password_hash = ?, must_change_password = 0 WHERE member_id = ?").bind(newHash, member.id).run();
+    await createAuditLog(c.env.DB, payload.id, "student", "PASSWORD_CHANGED", `Student changed password: ${payload.name}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to change password", details: e.message }, 500);
   }
 });
 var optionalAuth = /* @__PURE__ */ __name(async (c, next) => {
@@ -4367,18 +4598,37 @@ app.get("/api/verify/:uuid", optionalAuth, async (c) => {
     if (!member) {
       return c.json({ error: "Member not found" }, 404);
     }
-    const coordinators = await c.env.DB.prepare(
-      `SELECT m.full_name, m.email 
-       FROM members m 
-       JOIN member_clubs mc ON m.id = mc.member_id 
-       WHERE m.member_type = 'faculty' AND mc.club_id = ?`
-    ).bind(member.club_id).first();
-    const allCoordinators = await c.env.DB.prepare(
-      `SELECT m.full_name, m.email 
-       FROM members m 
-       WHERE m.member_type = 'faculty'`
-    ).all();
-    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    if (member.status === "suspended") {
+      return c.json({
+        error: "Member is suspended",
+        member: {
+          uuid: member.uuid,
+          name: member.full_name.trim(),
+          roll_number: member.roll_number,
+          status: "suspended",
+          club: member.club_name
+        }
+      }, 403);
+    }
+    if (member.status === "archived" || member.status === "graduated") {
+      return c.json({
+        error: `Member is ${member.status}`,
+        member: {
+          uuid: member.uuid,
+          name: member.full_name.trim(),
+          roll_number: member.roll_number,
+          status: member.status,
+          club: member.club_name
+        }
+      }, 403);
+    }
+    const clubCoordinators = await c.env.DB.prepare(
+      `SELECT m.full_name, m.email
+       FROM faculty_club_assignments fca
+       JOIN members m ON m.id = fca.faculty_member_id
+       WHERE fca.club_id = ?`
+    ).bind(member.club_id).all();
+    const today = getISTDate();
     const todayPermission = await c.env.DB.prepare(
       "SELECT p.*, h.name as hod_name FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ?"
     ).bind(uuid, today).first();
@@ -4388,12 +4638,21 @@ app.get("/api/verify/:uuid", optionalAuth, async (c) => {
       user?.id || "anonymous",
       user?.role || "public",
       "QR_SCANNED",
-      `QR scanned for member: ${member.full_name} (${member.roll_number})`
+      `QR scanned for member: ${member.full_name.trim()} (${member.roll_number})`
     );
+    let overdue_minutes = 0;
+    if (todayPermission?.expected_return_time && todayPermission.status === "granted") {
+      const now = /* @__PURE__ */ new Date();
+      const [hours, minutes] = todayPermission.expected_return_time.split(":").map(Number);
+      const expectedReturn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+      if (now > expectedReturn) {
+        overdue_minutes = Math.floor((now.getTime() - expectedReturn.getTime()) / 6e4);
+      }
+    }
     return c.json({
       member: {
         uuid: member.uuid,
-        member_id: `CP-${String(member.id).padStart(4, "0")}`,
+        member_id: formatMemberId(member.id),
         name: member.full_name.trim(),
         roll_number: member.roll_number,
         email: member.email,
@@ -4407,7 +4666,7 @@ app.get("/api/verify/:uuid", optionalAuth, async (c) => {
         photo_url: member.photo_url,
         member_type: member.member_type
       },
-      coordinators: allCoordinators?.results?.map((fc) => ({
+      coordinators: clubCoordinators?.results?.map((fc) => ({
         name: fc.full_name?.trim(),
         email: fc.email
       })) || [],
@@ -4416,10 +4675,15 @@ app.get("/api/verify/:uuid", optionalAuth, async (c) => {
         date: todayPermission.date,
         time: todayPermission.time,
         status: todayPermission.status,
+        effective_status: computeEffectiveStatus(todayPermission, getISTDate(), getISTTimeHM()),
         purpose: todayPermission.purpose,
         remark: todayPermission.remark,
+        expected_return_time: todayPermission.expected_return_time,
         approved_by: todayPermission.hod_name || "Unknown",
-        created_at: todayPermission.created_at
+        approved_at: todayPermission.approved_at,
+        completed_at: todayPermission.completed_at,
+        created_at: todayPermission.created_at,
+        overdue_minutes: overdue_minutes > 0 && todayPermission.status !== "completed" ? overdue_minutes : null
       } : null
     });
   } catch (e) {
@@ -4428,35 +4692,92 @@ app.get("/api/verify/:uuid", optionalAuth, async (c) => {
 });
 app.get("/api/permissions/today/:uuid", optionalAuth, async (c) => {
   const uuid = c.req.param("uuid");
-  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const today = getISTDate();
   try {
     const permission = await c.env.DB.prepare(
-      "SELECT p.*, h.name as hod_name FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ?"
+      "SELECT p.*, h.name as hod_name FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ? ORDER BY p.created_at DESC"
     ).bind(uuid, today).first();
+    if (permission) {
+      permission.effective_status = computeEffectiveStatus(permission, today, getISTTimeHM());
+    }
     return c.json({ permission: permission || null });
   } catch (e) {
     return c.json({ error: "Database error" }, 500);
   }
 });
+app.get("/api/fix-db", async (c) => {
+  try {
+    const tableInfo = await c.env.DB.prepare("PRAGMA table_info(permissions);").all();
+    const columns = tableInfo.results.map((col) => col.name);
+    await c.env.DB.prepare(`
+      CREATE TABLE permissions_new (
+        id TEXT PRIMARY KEY,
+        member_uuid TEXT NOT NULL,
+        hod_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT '',
+        remark TEXT,
+        status TEXT DEFAULT 'granted',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        closed_at TEXT,
+        closed_by TEXT,
+        close_reason TEXT,
+        completed_at TEXT,
+        club_id TEXT,
+        expected_return_time TEXT,
+        approved_at TEXT
+      )
+    `).run();
+    const colList = columns.join(", ");
+    await c.env.DB.prepare(`INSERT INTO permissions_new (${colList}) SELECT ${colList} FROM permissions`).run();
+    await c.env.DB.prepare("DROP TABLE permissions").run();
+    await c.env.DB.prepare("ALTER TABLE permissions_new RENAME TO permissions").run();
+    return c.json({ success: true, message: "Fixed permissions table schema", columns });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
 app.post("/api/permissions", requireAuth, requireRole("hod", "super_admin"), async (c) => {
   try {
-    const { member_uuid, purpose, remark, status } = await c.req.json();
+    const { member_uuid, purpose, remark, status, expected_return_time } = await c.req.json();
     const user = c.get("user");
     if (!member_uuid) {
       return c.json({ error: "member_uuid is required" }, 400);
     }
     const permissionStatus = status || "granted";
-    const date = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const date = getISTDate();
+    const now = /* @__PURE__ */ new Date();
+    const istOffset = 5.5 * 60 * 60 * 1e3;
+    const istDate = new Date(now.getTime() + istOffset);
+    const currentISTHour = istDate.getUTCHours();
+    const currentISTMin = istDate.getUTCMinutes();
+    const currentISTTimeStr = `${currentISTHour.toString().padStart(2, "0")}:${currentISTMin.toString().padStart(2, "0")}`;
+    if (currentISTTimeStr >= "16:00") {
+      return c.json({ error: "Permission hours for today have ended. New permissions can be granted on the next working day." }, 403);
+    }
+    if (expected_return_time) {
+      if (expected_return_time > "16:00") {
+        return c.json({ error: "Expected return time cannot exceed 16:00 (4:00 PM IST)." }, 400);
+      }
+      if (expected_return_time <= currentISTTimeStr) {
+        return c.json({ error: "Expected return time must be strictly after the current time." }, 400);
+      }
+    }
     const time = (/* @__PURE__ */ new Date()).toTimeString().split(" ")[0];
+    const approvedAt = (/* @__PURE__ */ new Date()).toISOString();
     const id = crypto.randomUUID();
     const existing = await c.env.DB.prepare(
-      "SELECT id, status FROM permissions WHERE member_uuid = ? AND date = ?"
+      "SELECT id, status, date, expected_return_time FROM permissions WHERE member_uuid = ? AND date = ? ORDER BY created_at DESC"
     ).bind(member_uuid, date).first();
     if (existing) {
-      return c.json({
-        error: "Permission already exists for today",
-        existing_permission: existing
-      }, 409);
+      const effective = computeEffectiveStatus(existing, date, currentISTTimeStr);
+      if (effective === "granted") {
+        return c.json({
+          error: "An active permission already exists for today",
+          existing_permission: existing
+        }, 409);
+      }
     }
     const member = await c.env.DB.prepare(
       `SELECT m.full_name, m.roll_number, c.name as club_name, mc.club_id
@@ -4469,8 +4790,8 @@ app.post("/api/permissions", requireAuth, requireRole("hod", "super_admin"), asy
       return c.json({ error: "Member not found" }, 404);
     }
     await c.env.DB.prepare(
-      "INSERT INTO permissions (id, member_uuid, hod_id, date, time, purpose, remark, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(id, member_uuid, user.id, date, time, purpose || "", remark || null, permissionStatus).run();
+      "INSERT INTO permissions (id, member_uuid, hod_id, date, time, purpose, remark, status, expected_return_time, approved_at, club_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, member_uuid, user.id, date, time, purpose || "", remark || null, permissionStatus, expected_return_time || null, approvedAt, member.club_id).run();
     await createAuditLog(
       c.env.DB,
       user.id,
@@ -4479,8 +4800,10 @@ app.post("/api/permissions", requireAuth, requireRole("hod", "super_admin"), asy
       `Permission ${permissionStatus} for ${member.full_name.trim()} (${member.roll_number}) by ${user.name}. Purpose: ${purpose || "N/A"}. Remark: ${remark || "N/A"}`
     );
     const coordinators = await c.env.DB.prepare(
-      `SELECT m.id, m.uuid FROM members m WHERE m.member_type = 'faculty'`
-    ).all();
+      `SELECT m.id, m.uuid FROM faculty_club_assignments fca
+       JOIN members m ON m.id = fca.faculty_member_id
+       WHERE fca.club_id = ?`
+    ).bind(member.club_id).all();
     for (const coord of coordinators.results || []) {
       await createNotification(
         c.env.DB,
@@ -4494,12 +4817,65 @@ app.post("/api/permissions", requireAuth, requireRole("hod", "super_admin"), asy
     }
     return c.json({
       success: true,
-      permission: { id, member_uuid, date, time, purpose, remark, status: permissionStatus, hod_id: user.id, approved_by: user.name }
+      permission: { id, member_uuid, date, time, purpose, remark, status: permissionStatus, effective_status: permissionStatus === "granted" ? "active" : permissionStatus, hod_id: user.id, approved_by: user.name, expected_return_time, approved_at: approvedAt }
     });
   } catch (e) {
     if (e.message?.includes("UNIQUE constraint")) {
-      return c.json({ error: "Permission already exists for today" }, 409);
+      return c.json({ error: "DB_UNIQUE_ERROR: " + e.message }, 409);
     }
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.post("/api/permissions/:id/close", requireAuth, requireRole("hod", "super_admin"), async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  console.log("CLOSE PERMISSION CALLED WITH ID:", id, "USER:", user.email);
+  try {
+    let body = {};
+    try {
+      body = await c.req.json();
+    } catch (e) {
+    }
+    const close_reason = body?.close_reason || "Student Returned";
+    const permission = await c.env.DB.prepare("SELECT * FROM permissions WHERE id = ?").bind(id).first();
+    if (!permission) return c.json({ error: "Permission not found" }, 404);
+    const currentHM = getISTTimeHM();
+    const effective = computeEffectiveStatus(permission, getISTDate(), currentHM);
+    if (effective !== "active") {
+      return c.json({ error: "Permission is no longer active" }, 400);
+    }
+    const nowUTC = getUTCDateTime();
+    await c.env.DB.prepare(
+      "UPDATE permissions SET status = 'closed', closed_at = ?, completed_at = ?, closed_by = ?, close_reason = ? WHERE id = ?"
+    ).bind(nowUTC, nowUTC, user.name, close_reason, id).run();
+    return c.json({ success: true, closed_at: nowUTC });
+  } catch (e) {
+    return c.json({ error: "Database error" }, 500);
+  }
+});
+app.post("/api/permissions/:id/complete", requireAuth, requireRole("coordinator", "super_admin"), async (c) => {
+  const id = c.req.param("id");
+  const completedAt = getUTCDateTime();
+  const user = c.get("user");
+  try {
+    const permission = await c.env.DB.prepare("SELECT * FROM permissions WHERE id = ?").bind(id).first();
+    if (!permission) return c.json({ error: "Permission not found" }, 404);
+    const effective = computeEffectiveStatus(permission, getISTDate(), getISTTimeHM());
+    if (effective !== "active") {
+      return c.json({ error: "Permission is no longer active" }, 400);
+    }
+    await c.env.DB.prepare(
+      "UPDATE permissions SET status = 'closed', closed_at = ?, completed_at = ?, closed_by = ?, close_reason = 'Closed by Coordinator' WHERE id = ?"
+    ).bind(completedAt, completedAt, user.name, id).run();
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      user.role,
+      "PERMISSION_COMPLETED",
+      `Permission marked completed by ${user.name} for permission ID: ${id}`
+    );
+    return c.json({ success: true, completed_at: completedAt });
+  } catch (e) {
     return c.json({ error: "Database error", details: e.message }, 500);
   }
 });
@@ -4529,7 +4905,7 @@ app.get("/api/permissions", requireAuth, async (c) => {
   const offset = (page - 1) * limit;
   try {
     let query = `
-      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, c.name as club_name
+      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
       FROM permissions p
       LEFT JOIN hods h ON p.hod_id = h.id
       LEFT JOIN members m ON m.uuid = p.member_uuid
@@ -4543,14 +4919,30 @@ app.get("/api/permissions", requireAuth, async (c) => {
       params.push(date);
     }
     if (status) {
-      query += " AND p.status = ?";
-      params.push(status);
+      if (status === "granted" || status === "active") {
+        const currentISTDate2 = getISTDate();
+        const currentISTHM2 = getISTTimeHM();
+        query += " AND p.status = 'granted' AND p.date = ? AND (? < '16:00') AND (p.expected_return_time IS NULL OR p.expected_return_time > ?)";
+        params.push(currentISTDate2, currentISTHM2, currentISTHM2);
+      } else if (status === "expired") {
+        const currentISTDate2 = getISTDate();
+        const currentISTHM2 = getISTTimeHM();
+        query += " AND p.status = 'granted' AND (p.date < ? OR ? >= '16:00' OR (p.expected_return_time IS NOT NULL AND p.expected_return_time <= ?))";
+        params.push(currentISTDate2, currentISTHM2, currentISTHM2);
+      } else {
+        query += " AND p.status = ?";
+        params.push(status);
+      }
     }
     if (department) {
       query += " AND m.department = ?";
       params.push(department);
     }
-    if (club) {
+    const user = c.get("user");
+    if (user && user.role === "coordinator" && user.club_id) {
+      query += " AND mc.club_id = ?";
+      params.push(user.club_id);
+    } else if (club) {
       query += " AND c.name = ?";
       params.push(club);
     }
@@ -4558,7 +4950,28 @@ app.get("/api/permissions", requireAuth, async (c) => {
     params.push(limit, offset);
     const stmt = c.env.DB.prepare(query);
     const result = await stmt.bind(...params).all();
-    return c.json({ permissions: result.results, page, limit });
+    const currentISTDate = getISTDate();
+    const currentISTHM = getISTTimeHM();
+    const permissions = result.results?.map((p) => ({
+      ...p,
+      effective_status: computeEffectiveStatus(p, currentISTDate, currentISTHM)
+    })) || [];
+    return c.json({ permissions, page, limit });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.get("/api/coordinator/faculty", requireAuth, requireRole("coordinator", "super_admin"), async (c) => {
+  const clubId = c.req.query("club_id") || c.get("user")?.club_id;
+  if (!clubId) return c.json({ error: "club_id required" }, 400);
+  try {
+    const faculty = await c.env.DB.prepare(
+      `SELECT m.id, m.full_name, m.email, m.phone, m.department 
+       FROM faculty_club_assignments fca
+       JOIN members m ON fca.faculty_member_id = m.id
+       WHERE fca.club_id = ?`
+    ).bind(clubId).all();
+    return c.json({ faculty: faculty.results || [] });
   } catch (e) {
     return c.json({ error: "Database error", details: e.message }, 500);
   }
@@ -4568,6 +4981,8 @@ app.get("/api/members", requireAuth, async (c) => {
   const department = c.req.query("department");
   const club = c.req.query("club");
   const memberType = c.req.query("member_type");
+  const status = c.req.query("status");
+  const section = c.req.query("section");
   const page = parseInt(c.req.query("page") || "1");
   const limit = parseInt(c.req.query("limit") || "50");
   const offset = (page - 1) * limit;
@@ -4589,13 +5004,25 @@ app.get("/api/members", requireAuth, async (c) => {
       query += " AND m.department = ?";
       params.push(department);
     }
-    if (club) {
+    const user = c.get("user");
+    if (user && user.role === "coordinator" && user.club_id) {
+      query += " AND mc.club_id = ?";
+      params.push(user.club_id);
+    } else if (club) {
       query += " AND c.name = ?";
       params.push(club);
     }
     if (memberType) {
       query += " AND m.member_type = ?";
       params.push(memberType);
+    }
+    if (status) {
+      query += " AND m.status = ?";
+      params.push(status);
+    }
+    if (section) {
+      query += " AND m.section = ?";
+      params.push(section);
     }
     query += " ORDER BY m.id ASC LIMIT ? OFFSET ?";
     params.push(limit, offset);
@@ -4611,7 +5038,10 @@ app.get("/api/members", requireAuth, async (c) => {
       countQuery += " AND m.department = ?";
       countParams.push(department);
     }
-    if (club) {
+    if (user && user.role === "coordinator" && user.club_id) {
+      countQuery += " AND mc.club_id = ?";
+      countParams.push(user.club_id);
+    } else if (club) {
       countQuery += " AND c.name = ?";
       countParams.push(club);
     }
@@ -4619,12 +5049,20 @@ app.get("/api/members", requireAuth, async (c) => {
       countQuery += " AND m.member_type = ?";
       countParams.push(memberType);
     }
+    if (status) {
+      countQuery += " AND m.status = ?";
+      countParams.push(status);
+    }
+    if (section) {
+      countQuery += " AND m.section = ?";
+      countParams.push(section);
+    }
     const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first();
     return c.json({
       members: result.results?.map((m) => ({
         ...m,
         full_name: m.full_name?.trim(),
-        member_id: `CP-${String(m.id).padStart(4, "0")}`
+        member_id: formatMemberId(m.id)
       })),
       total: countResult?.total || 0,
       page,
@@ -4645,13 +5083,71 @@ app.get("/api/members/:uuid", requireAuth, async (c) => {
        WHERE m.uuid = ?`
     ).bind(uuid).first();
     if (!member) return c.json({ error: "Member not found" }, 404);
+    const coordinators = await c.env.DB.prepare(
+      `SELECT m.full_name, m.email
+       FROM faculty_club_assignments fca
+       JOIN members m ON m.id = fca.faculty_member_id
+       WHERE fca.club_id = ?`
+    ).bind(member.club_id).all();
     return c.json({
       ...member,
       full_name: member.full_name?.trim(),
-      member_id: `CP-${String(member.id).padStart(4, "0")}`
+      member_id: formatMemberId(member.id),
+      coordinators: coordinators.results?.map((fc) => ({
+        name: fc.full_name?.trim(),
+        email: fc.email
+      })) || []
     });
   } catch (e) {
     return c.json({ error: "Database error" }, 500);
+  }
+});
+app.get("/api/members/:uuid/profile", requireAuth, async (c) => {
+  const uuid = c.req.param("uuid");
+  try {
+    const member = await c.env.DB.prepare(
+      `SELECT m.*, mc.club_id, mc.role as club_role, c.name as club_name
+       FROM members m
+       JOIN member_clubs mc ON m.id = mc.member_id
+       JOIN clubs c ON mc.club_id = c.id
+       WHERE m.uuid = ?`
+    ).bind(uuid).first();
+    if (!member) return c.json({ error: "Member not found" }, 404);
+    const coordinators = await c.env.DB.prepare(
+      `SELECT m.full_name, m.email
+       FROM faculty_club_assignments fca
+       JOIN members m ON m.id = fca.faculty_member_id
+       WHERE fca.club_id = ?`
+    ).bind(member.club_id).all();
+    const permissions = await c.env.DB.prepare(
+      `SELECT p.*, h.name as hod_name FROM permissions p
+       LEFT JOIN hods h ON p.hod_id = h.id
+       WHERE p.member_uuid = ?
+       ORDER BY p.created_at DESC LIMIT 20`
+    ).bind(uuid).all();
+    const activities = await c.env.DB.prepare(
+      `SELECT * FROM audit_logs
+       WHERE details LIKE ? OR details LIKE ?
+       ORDER BY created_at DESC LIMIT 20`
+    ).bind(`%${uuid}%`, `%${member.roll_number}%`).all();
+    return c.json({
+      member: {
+        ...member,
+        full_name: member.full_name?.trim(),
+        member_id: formatMemberId(member.id)
+      },
+      coordinators: coordinators.results?.map((fc) => ({
+        name: fc.full_name?.trim(),
+        email: fc.email
+      })) || [],
+      permissions: permissions.results?.map((p) => ({
+        ...p,
+        effective_status: computeEffectiveStatus(p, getISTDate(), getISTTimeHM())
+      })) || [],
+      activities: activities.results || []
+    });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
   }
 });
 app.get("/api/clubs", async (c) => {
@@ -4660,6 +5156,48 @@ app.get("/api/clubs", async (c) => {
     return c.json({ clubs: clubs.results });
   } catch (e) {
     return c.json({ error: "Database error" }, 500);
+  }
+});
+app.get("/api/clubs/:id/stats", requireAuth, async (c) => {
+  const clubId = c.req.param("id");
+  try {
+    const club = await c.env.DB.prepare("SELECT * FROM clubs WHERE id = ?").bind(clubId).first();
+    if (!club) return c.json({ error: "Club not found" }, 404);
+    const total = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM members m JOIN member_clubs mc ON m.id = mc.member_id WHERE mc.club_id = ? AND m.member_type = 'student'`
+    ).bind(clubId).first();
+    const active = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM members m JOIN member_clubs mc ON m.id = mc.member_id WHERE mc.club_id = ? AND m.member_type = 'student' AND m.status = 'active'`
+    ).bind(clubId).first();
+    const suspended = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM members m JOIN member_clubs mc ON m.id = mc.member_id WHERE mc.club_id = ? AND m.member_type = 'student' AND m.status = 'suspended'`
+    ).bind(clubId).first();
+    const archived = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM members m JOIN member_clubs mc ON m.id = mc.member_id WHERE mc.club_id = ? AND m.member_type = 'student' AND (m.status = 'archived' OR m.status = 'graduated')`
+    ).bind(clubId).first();
+    const faculty = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM faculty_club_assignments WHERE club_id = ?`
+    ).bind(clubId).first();
+    const coordinators = await c.env.DB.prepare(
+      `SELECT m.id, m.full_name, m.email FROM faculty_club_assignments fca JOIN members m ON m.id = fca.faculty_member_id WHERE fca.club_id = ?`
+    ).bind(clubId).all();
+    return c.json({
+      club,
+      stats: {
+        total_members: total?.count || 0,
+        active_members: active?.count || 0,
+        suspended_members: suspended?.count || 0,
+        archived_members: archived?.count || 0,
+        faculty_count: faculty?.count || 0
+      },
+      coordinators: coordinators.results?.map((fc) => ({
+        id: fc.id,
+        name: fc.full_name?.trim(),
+        email: fc.email
+      })) || []
+    });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
   }
 });
 app.get("/api/notifications", requireAuth, async (c) => {
@@ -4679,6 +5217,92 @@ app.get("/api/notifications", requireAuth, async (c) => {
     return c.json({ notifications: result.results, unread_count: unreadCount?.count || 0 });
   } catch (e) {
     return c.json({ error: "Database error" }, 500);
+  }
+});
+app.post("/api/notifications/broadcast", requireAuth, requireRole("super_admin", "institution_admin", "hod", "coordinator"), async (c) => {
+  const user = c.get("user");
+  const { title, message, target_audience, club_id, department } = await c.req.json();
+  if (!title || !message || !target_audience) {
+    return c.json({ error: "Missing required fields" }, 400);
+  }
+  try {
+    let recipientQuery = "";
+    const queryParams = [];
+    if (user.role === "super_admin" || user.role === "institution_admin") {
+      if (target_audience === "all_students") {
+        recipientQuery = "SELECT id, 'student' as role FROM members WHERE status IN ('active', 'inactive')";
+      } else if (target_audience === "all_hods") {
+        recipientQuery = "SELECT id, 'hod' as role FROM hods";
+      } else if (target_audience === "all_coordinators") {
+        recipientQuery = `SELECT faculty_member_id as id, 'coordinator' as role FROM faculty_club_assignments GROUP BY faculty_member_id
+                          UNION
+                          SELECT id, 'coordinator' as role FROM coordinator_credentials`;
+      } else if (target_audience === "club") {
+        if (!club_id) return c.json({ error: "club_id required" }, 400);
+        recipientQuery = "SELECT member_id as id, 'student' as role FROM member_clubs WHERE club_id = ?";
+        queryParams.push(club_id);
+      } else if (target_audience === "department") {
+        if (!department) return c.json({ error: "department required" }, 400);
+        recipientQuery = "SELECT id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')";
+        queryParams.push(department);
+      } else if (target_audience === "all") {
+        recipientQuery = `SELECT id, 'student' as role FROM members WHERE status IN ('active', 'inactive')
+                          UNION SELECT id, 'hod' as role FROM hods
+                          UNION SELECT id, role FROM admins WHERE role IN ('institution_admin', 'super_admin')
+                          UNION SELECT faculty_member_id as id, 'coordinator' as role FROM faculty_club_assignments GROUP BY faculty_member_id
+                          UNION SELECT id, 'coordinator' as role FROM coordinator_credentials`;
+      } else {
+        return c.json({ error: "Invalid target_audience" }, 400);
+      }
+    } else if (user.role === "hod") {
+      if (target_audience !== "department") return c.json({ error: "HODs can only notify their department" }, 403);
+      const hod = await c.env.DB.prepare("SELECT department FROM hods WHERE id = ?").bind(user.id).first();
+      if (!hod || hod.department !== department) return c.json({ error: "Unauthorized department" }, 403);
+      recipientQuery = "SELECT id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')";
+      queryParams.push(department);
+    } else if (user.role === "coordinator") {
+      if (target_audience !== "club") return c.json({ error: "Coordinators can only notify their clubs" }, 403);
+      const targetClub = user.club_id || club_id;
+      if (!targetClub) return c.json({ error: "club_id required" }, 400);
+      if (!user.club_id) {
+        const isAssigned = await c.env.DB.prepare("SELECT 1 FROM faculty_club_assignments WHERE faculty_member_id = ? AND club_id = ?").bind(user.id, targetClub).first();
+        if (!isAssigned) return c.json({ error: "Unauthorized club" }, 403);
+      } else if (String(targetClub) !== String(user.club_id)) {
+        return c.json({ error: "Unauthorized club" }, 403);
+      }
+      recipientQuery = "SELECT member_id as id, 'student' as role FROM member_clubs WHERE club_id = ?";
+      queryParams.push(targetClub);
+    }
+    if (!recipientQuery) return c.json({ error: "Invalid request" }, 400);
+    const recipients = await c.env.DB.prepare(recipientQuery).bind(...queryParams).all();
+    if (!recipients.results || recipients.results.length === 0) {
+      return c.json({ error: "No recipients found" }, 404);
+    }
+    const statements = [];
+    const type = "announcement";
+    for (const r of recipients.results) {
+      const id = crypto.randomUUID();
+      statements.push(
+        c.env.DB.prepare(
+          "INSERT INTO notifications (id, recipient_id, recipient_role, type, title, message) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(id, String(r.id), r.role, type, title, message)
+      );
+    }
+    const chunkSize = 90;
+    for (let i = 0; i < statements.length; i += chunkSize) {
+      const chunk = statements.slice(i, i + chunkSize);
+      await c.env.DB.batch(chunk);
+    }
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      user.role,
+      "BROADCAST_NOTIFICATION",
+      `Sent announcement "${title}" to ${recipients.results.length} recipients`
+    );
+    return c.json({ success: true, count: recipients.results.length });
+  } catch (e) {
+    return c.json({ error: "Broadcast failed", details: e.message }, 500);
   }
 });
 app.patch("/api/notifications/:id/read", requireAuth, async (c) => {
@@ -4726,18 +5350,34 @@ app.get("/api/audit-logs", requireAuth, requireRole("super_admin"), async (c) =>
 });
 app.get("/api/export/members", requireAuth, requireRole("super_admin", "hod"), async (c) => {
   const format = c.req.query("format") || "csv";
+  const club = c.req.query("club");
+  const department = c.req.query("department");
+  const status = c.req.query("status");
   try {
-    const result = await c.env.DB.prepare(
-      `SELECT m.id, m.uuid, m.roll_number, m.full_name, m.email, m.phone, m.department, m.section, m.member_type, m.status, m.year, mc.role as club_role, c.name as club_name
+    let query = `SELECT m.id, m.uuid, m.roll_number, m.full_name, m.email, m.phone, m.department, m.section, m.member_type, m.status, m.year, mc.role as club_role, c.name as club_name
        FROM members m
        JOIN member_clubs mc ON m.id = mc.member_id
        JOIN clubs c ON mc.club_id = c.id
-       ORDER BY m.id`
-    ).all();
+       WHERE 1=1`;
+    const params = [];
+    if (club) {
+      query += " AND c.name = ?";
+      params.push(club);
+    }
+    if (department) {
+      query += " AND m.department = ?";
+      params.push(department);
+    }
+    if (status) {
+      query += " AND m.status = ?";
+      params.push(status);
+    }
+    query += " ORDER BY m.id";
+    const result = await c.env.DB.prepare(query).bind(...params).all();
     if (format === "csv") {
-      const headers = ["ID", "UUID", "Roll Number", "Name", "Email", "Phone", "Department", "Section", "Type", "Status", "Year", "Role", "Club"];
+      const headers = ["ID", "Member ID", "UUID", "Roll Number", "Name", "Email", "Phone", "Department", "Section", "Type", "Status", "Year", "Role", "Club"];
       const rows = result.results?.map(
-        (m) => [m.id, m.uuid, m.roll_number, m.full_name?.trim(), m.email, m.phone, m.department, m.section, m.member_type, m.status, m.year, m.club_role, m.club_name].map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")
+        (m) => [m.id, formatMemberId(m.id), m.uuid, m.roll_number, m.full_name?.trim(), m.email, m.phone, m.department, m.section, m.member_type, m.status, m.year, m.club_role, m.club_name].map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")
       );
       const csv = [headers.join(","), ...rows || []].join("\n");
       return new Response(csv, {
@@ -4752,13 +5392,19 @@ app.get("/api/export/members", requireAuth, requireRole("super_admin", "hod"), a
     return c.json({ error: "Export failed" }, 500);
   }
 });
-app.get("/api/export/permissions", requireAuth, requireRole("super_admin", "hod"), async (c) => {
+app.get("/api/export/permissions", requireAuth, requireRole("super_admin", "hod", "institution_admin", "coordinator"), async (c) => {
   const format = c.req.query("format") || "csv";
+  const user = c.get("user");
   const dateFrom = c.req.query("date_from");
   const dateTo = c.req.query("date_to");
+  const month = c.req.query("month");
+  const date = c.req.query("date");
+  const clubFilter = c.req.query("club");
+  const deptFilter = c.req.query("department");
+  const statusFilter = c.req.query("status");
   try {
     let query = `
-      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, c.name as club_name
+      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
       FROM permissions p
       LEFT JOIN hods h ON p.hod_id = h.id
       LEFT JOIN members m ON m.uuid = p.member_uuid
@@ -4767,26 +5413,81 @@ app.get("/api/export/permissions", requireAuth, requireRole("super_admin", "hod"
       WHERE 1=1
     `;
     const params = [];
-    if (dateFrom) {
-      query += " AND p.date >= ?";
-      params.push(dateFrom);
+    if (date) {
+      query += " AND p.date = ?";
+      params.push(date);
+    } else if (month) {
+      query += " AND p.date LIKE ?";
+      params.push(month + "%");
+    } else {
+      if (dateFrom) {
+        query += " AND p.date >= ?";
+        params.push(dateFrom);
+      }
+      if (dateTo) {
+        query += " AND p.date <= ?";
+        params.push(dateTo);
+      }
     }
-    if (dateTo) {
-      query += " AND p.date <= ?";
-      params.push(dateTo);
+    if (statusFilter && statusFilter !== "all") {
+      query += " AND p.status = ?";
+      params.push(statusFilter);
+    } else {
+      query += " AND p.status != 'rejected'";
     }
-    query += " ORDER BY p.created_at DESC";
+    if (user && user.role === "coordinator" && user.club_id) {
+      query += " AND mc.club_id = ?";
+      params.push(user.club_id);
+    } else if (clubFilter) {
+      query += " AND c.name = ?";
+      params.push(clubFilter);
+    }
+    if (deptFilter) {
+      query += " AND m.department = ?";
+      params.push(deptFilter);
+    }
+    if (user.role === "hod") {
+      const hod = await c.env.DB.prepare("SELECT department FROM hods WHERE id = ?").bind(user.id).first();
+      if (hod) {
+        query += " AND m.department = ?";
+        params.push(hod.department);
+      }
+    } else if (user.role === "coordinator" && !user.club_id) {
+      query += " AND mc.club_id IN (SELECT club_id FROM faculty_club_assignments WHERE faculty_member_id = ?)";
+      params.push(user.id);
+    }
+    query += " ORDER BY p.date DESC, p.created_at DESC";
     const result = await c.env.DB.prepare(query).bind(...params).all();
     if (format === "csv") {
-      const headers = ["ID", "Member", "Roll Number", "Department", "Club", "Date", "Time", "Status", "Purpose", "Remark", "Approved By"];
-      const rows = result.results?.map(
-        (p) => [p.id, p.member_name?.trim(), p.roll_number, p.department, p.club_name, p.date, p.time, p.status, p.purpose, p.remark, p.hod_name].map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")
-      );
+      const headers = ["S.No", "Date", "Student Name", "Roll Number", "Department", "Year", "Section", "Club", "Purpose", "Permission Granted At", "Permission Valid Until", "Actual End Time", "Final Status", "Granted By", "Closed At", "Closed By"];
+      const rows = result.results?.map((p, index) => {
+        const effectiveStatus = computeEffectiveStatus(p, getISTDate(), getISTTimeHM());
+        const displayStatus = effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1);
+        return [
+          index + 1,
+          p.date,
+          p.member_name?.trim(),
+          p.roll_number,
+          p.department,
+          p.year ? `Year ${p.year}` : "",
+          p.section,
+          p.club_name,
+          p.purpose,
+          p.approved_at || p.time,
+          p.expected_return_time || "16:00",
+          p.completed_at || "",
+          displayStatus,
+          p.hod_name || "Unknown",
+          p.completed_at || "",
+          p.completed_at ? p.hod_name || "System" : ""
+          // Assuming HOD closed it if completed
+        ].map((v) => `"\${String(v || '').replace(/"/g, '""')}"`).join(",");
+      });
       const csv = [headers.join(","), ...rows || []].join("\n");
       return new Response(csv, {
         headers: {
           "Content-Type": "text/csv",
-          "Content-Disposition": 'attachment; filename="permissions.csv"'
+          "Content-Disposition": 'attachment; filename="Attendance_Report.csv"'
         }
       });
     }
@@ -4817,25 +5518,602 @@ app.get("/api/export/audit-logs", requireAuth, requireRole("super_admin"), async
     return c.json({ error: "Export failed" }, 500);
   }
 });
+app.get("/api/export/faculty", requireAuth, requireRole("super_admin"), async (c) => {
+  const format = c.req.query("format") || "csv";
+  try {
+    const result = await c.env.DB.prepare(
+      `SELECT m.id, m.full_name, m.email, m.phone, m.department, c.name as club_name
+       FROM members m
+       LEFT JOIN faculty_club_assignments fca ON m.id = fca.faculty_member_id
+       LEFT JOIN clubs c ON fca.club_id = c.id
+       WHERE m.member_type = 'faculty'
+       ORDER BY m.full_name`
+    ).all();
+    if (format === "csv") {
+      const headers = ["ID", "Name", "Email", "Phone", "Department", "Assigned Club"];
+      const rows = result.results?.map(
+        (f) => [f.id, f.full_name?.trim(), f.email, f.phone, f.department, f.club_name || "Unassigned"].map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")
+      );
+      const csv = [headers.join(","), ...rows || []].join("\n");
+      return new Response(csv, {
+        headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="faculty.csv"' }
+      });
+    }
+    return c.json({ data: result.results });
+  } catch (e) {
+    return c.json({ error: "Export failed" }, 500);
+  }
+});
+app.get("/api/export/clubs", requireAuth, requireRole("super_admin"), async (c) => {
+  const format = c.req.query("format") || "csv";
+  try {
+    const result = await c.env.DB.prepare(
+      `SELECT c.*, 
+        (SELECT COUNT(*) FROM member_clubs mc JOIN members m ON m.id = mc.member_id WHERE mc.club_id = c.id AND m.member_type = 'student') as member_count,
+        (SELECT COUNT(*) FROM faculty_club_assignments fca WHERE fca.club_id = c.id) as faculty_count
+       FROM clubs c ORDER BY c.id`
+    ).all();
+    if (format === "csv") {
+      const headers = ["ID", "Name", "Description", "Status", "Members", "Faculty", "Created At"];
+      const rows = result.results?.map(
+        (c2) => [c2.id, c2.name, c2.description, c2.status || "active", c2.member_count, c2.faculty_count, c2.created_at].map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")
+      );
+      const csv = [headers.join(","), ...rows || []].join("\n");
+      return new Response(csv, {
+        headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="clubs.csv"' }
+      });
+    }
+    return c.json({ data: result.results });
+  } catch (e) {
+    return c.json({ error: "Export failed" }, 500);
+  }
+});
 app.get("/api/stats", requireAuth, async (c) => {
   try {
-    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const today = getISTDate();
     const totalMembers = await c.env.DB.prepare("SELECT COUNT(*) as count FROM members WHERE member_type = ?").bind("student").first();
     const totalClubs = await c.env.DB.prepare("SELECT COUNT(*) as count FROM clubs").first();
     const todayPermissions = await c.env.DB.prepare("SELECT COUNT(*) as count FROM permissions WHERE date = ?").bind(today).first();
     const totalPermissions = await c.env.DB.prepare("SELECT COUNT(*) as count FROM permissions").first();
     const todayGranted = await c.env.DB.prepare("SELECT COUNT(*) as count FROM permissions WHERE date = ? AND status = 'granted'").bind(today).first();
     const todayRejected = await c.env.DB.prepare("SELECT COUNT(*) as count FROM permissions WHERE date = ? AND status = 'rejected'").bind(today).first();
+    const activeMembers = await c.env.DB.prepare("SELECT COUNT(*) as count FROM members WHERE member_type = 'student' AND status = 'active'").first();
+    const suspendedMembers = await c.env.DB.prepare("SELECT COUNT(*) as count FROM members WHERE member_type = 'student' AND status = 'suspended'").first();
     return c.json({
       total_members: totalMembers?.count || 0,
       total_clubs: totalClubs?.count || 0,
       today_permissions: todayPermissions?.count || 0,
       total_permissions: totalPermissions?.count || 0,
       today_granted: todayGranted?.count || 0,
-      today_rejected: todayRejected?.count || 0
+      today_rejected: todayRejected?.count || 0,
+      active_members: activeMembers?.count || 0,
+      suspended_members: suspendedMembers?.count || 0
     });
   } catch (e) {
     return c.json({ error: "Database error" }, 500);
+  }
+});
+app.post("/api/members/:uuid/regenerate-qr", requireAuth, requireRole("super_admin"), async (c) => {
+  const oldUuid = c.req.param("uuid");
+  const user = c.get("user");
+  try {
+    const member = await c.env.DB.prepare("SELECT id, full_name, roll_number, uuid FROM members WHERE uuid = ?").bind(oldUuid).first();
+    if (!member) return c.json({ error: "Member not found" }, 404);
+    const newUuid = crypto.randomUUID();
+    await c.env.DB.prepare("UPDATE members SET uuid = ? WHERE id = ?").bind(newUuid, member.id).run();
+    await c.env.DB.prepare("UPDATE permissions SET member_uuid = ? WHERE member_uuid = ?").bind(newUuid, oldUuid).run();
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      "QR_REGENERATED",
+      `QR regenerated for ${member.full_name.trim()} (${member.roll_number}). Old: ${oldUuid} \u2192 New: ${newUuid}`
+    );
+    return c.json({ success: true, new_uuid: newUuid });
+  } catch (e) {
+    return c.json({ error: "Failed to regenerate QR", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/members", requireAuth, requireRole("super_admin"), async (c) => {
+  const user = c.get("user");
+  try {
+    const body = await c.req.json();
+    const { roll_number, full_name, email, phone, department, section, member_type, year, club_id, role } = body;
+    if (!roll_number || !full_name || !department) {
+      return c.json({ error: "roll_number, full_name, and department are required" }, 400);
+    }
+    const uuid = crypto.randomUUID();
+    const mType = member_type || "student";
+    await c.env.DB.prepare(
+      `INSERT INTO members (roll_number, full_name, email, phone, department, section, member_type, uuid, year, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`
+    ).bind(roll_number, full_name, email || null, phone || null, department, section || null, mType, uuid, year || 1).run();
+    const newMember = await c.env.DB.prepare("SELECT id FROM members WHERE uuid = ?").bind(uuid).first();
+    if (newMember && club_id) {
+      await c.env.DB.prepare("INSERT INTO member_clubs (member_id, club_id, role) VALUES (?, ?, ?)").bind(newMember.id, club_id, role || "Member").run();
+    }
+    if (mType === "student" && newMember) {
+      const tempPasswordHash = await hashPassword(roll_number);
+      await c.env.DB.prepare(
+        "INSERT OR IGNORE INTO student_credentials (member_id, username, password_hash, must_change_password) VALUES (?, ?, ?, 1)"
+      ).bind(newMember.id, roll_number, tempPasswordHash).run();
+    }
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      "MEMBER_CREATED",
+      `Member created: ${full_name} (${roll_number}), dept: ${department}, club: ${club_id || "none"}`
+    );
+    if (club_id) {
+      const coordinators = await c.env.DB.prepare(
+        `SELECT m.uuid FROM faculty_club_assignments fca JOIN members m ON m.id = fca.faculty_member_id WHERE fca.club_id = ?`
+      ).bind(club_id).all();
+      for (const coord of coordinators.results || []) {
+        await createNotification(
+          c.env.DB,
+          coord.uuid,
+          "coordinator",
+          "member_added",
+          "New Member Added",
+          `${full_name} (${roll_number}) has been added to the club.`,
+          uuid
+        );
+      }
+    }
+    return c.json({
+      success: true,
+      uuid,
+      id: newMember?.id,
+      member_id: newMember ? formatMemberId(newMember.id) : null
+    });
+  } catch (e) {
+    if (e.message?.includes("UNIQUE")) return c.json({ error: "Member with this roll number already exists" }, 409);
+    return c.json({ error: "Failed to create member", details: e.message }, 500);
+  }
+});
+app.put("/api/admin/members/:uuid", requireAuth, requireRole("super_admin"), async (c) => {
+  const uuid = c.req.param("uuid");
+  const user = c.get("user");
+  try {
+    const body = await c.req.json();
+    const { full_name, email, phone, department, section, year, status, position } = body;
+    const member = await c.env.DB.prepare("SELECT id, full_name FROM members WHERE uuid = ?").bind(uuid).first();
+    if (!member) return c.json({ error: "Member not found" }, 404);
+    const updates = [];
+    const params = [];
+    if (full_name !== void 0) {
+      updates.push("full_name = ?");
+      params.push(full_name);
+    }
+    if (email !== void 0) {
+      updates.push("email = ?");
+      params.push(email);
+    }
+    if (phone !== void 0) {
+      updates.push("phone = ?");
+      params.push(phone);
+    }
+    if (department !== void 0) {
+      updates.push("department = ?");
+      params.push(department);
+    }
+    if (section !== void 0) {
+      updates.push("section = ?");
+      params.push(section);
+    }
+    if (year !== void 0) {
+      updates.push("year = ?");
+      params.push(year);
+    }
+    if (status !== void 0) {
+      updates.push("status = ?");
+      params.push(status);
+    }
+    if (position !== void 0) {
+      updates.push("position = ?");
+      params.push(position);
+    }
+    if (updates.length === 0) return c.json({ error: "No fields to update" }, 400);
+    params.push(uuid);
+    await c.env.DB.prepare(`UPDATE members SET ${updates.join(", ")} WHERE uuid = ?`).bind(...params).run();
+    const action = status === "suspended" ? "MEMBER_SUSPENDED" : status === "archived" ? "MEMBER_ARCHIVED" : status === "graduated" ? "MEMBER_GRADUATED" : "MEMBER_UPDATED";
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      action,
+      `Member updated: ${member.full_name.trim()} \u2192 ${JSON.stringify(body)}`
+    );
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to update member", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/members/:uuid/reset-password", requireAuth, requireRole("super_admin"), async (c) => {
+  const uuid = c.req.param("uuid");
+  const user = c.get("user");
+  try {
+    const member = await c.env.DB.prepare("SELECT id, full_name, roll_number FROM members WHERE uuid = ?").bind(uuid).first();
+    if (!member) return c.json({ error: "Member not found" }, 404);
+    const tempHash = await hashPassword(member.roll_number);
+    await c.env.DB.prepare(
+      "UPDATE student_credentials SET password_hash = ?, must_change_password = 1, login_attempts = 0, locked_until = NULL WHERE member_id = ?"
+    ).bind(tempHash, member.id).run();
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      "PASSWORD_RESET",
+      `Password reset for student ${member.full_name.trim()} (${member.roll_number})`
+    );
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to reset password", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/members/:uuid/transfer", requireAuth, requireRole("super_admin"), async (c) => {
+  const uuid = c.req.param("uuid");
+  const user = c.get("user");
+  try {
+    const { new_club_id, new_role } = await c.req.json();
+    if (!new_club_id) return c.json({ error: "new_club_id is required" }, 400);
+    const member = await c.env.DB.prepare(
+      `SELECT m.id, m.full_name, m.roll_number, mc.club_id as old_club_id, c.name as old_club_name
+       FROM members m
+       JOIN member_clubs mc ON m.id = mc.member_id
+       JOIN clubs c ON mc.club_id = c.id
+       WHERE m.uuid = ?`
+    ).bind(uuid).first();
+    if (!member) return c.json({ error: "Member not found" }, 404);
+    const newClub = await c.env.DB.prepare("SELECT name FROM clubs WHERE id = ?").bind(new_club_id).first();
+    if (!newClub) return c.json({ error: "Target club not found" }, 404);
+    await c.env.DB.prepare("UPDATE member_clubs SET club_id = ?, role = ? WHERE member_id = ?").bind(new_club_id, new_role || "Member", member.id).run();
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      "MEMBER_TRANSFERRED",
+      `${member.full_name.trim()} (${member.roll_number}) transferred from ${member.old_club_name} to ${newClub.name}`
+    );
+    return c.json({ success: true, old_club: member.old_club_name, new_club: newClub.name });
+  } catch (e) {
+    return c.json({ error: "Failed to transfer member", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/members/bulk", requireAuth, requireRole("super_admin"), async (c) => {
+  const user = c.get("user");
+  try {
+    const { action, member_uuids, club_id } = await c.req.json();
+    if (!action || !member_uuids || !Array.isArray(member_uuids) || member_uuids.length === 0) {
+      return c.json({ error: "action and member_uuids[] are required" }, 400);
+    }
+    let processed = 0;
+    for (const uuid of member_uuids) {
+      try {
+        if (action === "suspend") {
+          await c.env.DB.prepare("UPDATE members SET status = 'suspended' WHERE uuid = ?").bind(uuid).run();
+          processed++;
+        } else if (action === "activate") {
+          await c.env.DB.prepare("UPDATE members SET status = 'active' WHERE uuid = ?").bind(uuid).run();
+          processed++;
+        } else if (action === "archive") {
+          await c.env.DB.prepare("UPDATE members SET status = 'archived' WHERE uuid = ?").bind(uuid).run();
+          processed++;
+        } else if (action === "assign_club" && club_id) {
+          const member = await c.env.DB.prepare("SELECT id FROM members WHERE uuid = ?").bind(uuid).first();
+          if (member) {
+            await c.env.DB.prepare("UPDATE member_clubs SET club_id = ? WHERE member_id = ?").bind(club_id, member.id).run();
+            processed++;
+          }
+        }
+      } catch {
+      }
+    }
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      `BULK_${action.toUpperCase()}`,
+      `Bulk ${action}: ${processed}/${member_uuids.length} members processed`
+    );
+    return c.json({ success: true, processed, total: member_uuids.length });
+  } catch (e) {
+    return c.json({ error: "Bulk operation failed", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/hods", requireAuth, requireRole("super_admin"), async (c) => {
+  const user = c.get("user");
+  try {
+    const { name, department, email, password } = await c.req.json();
+    if (!name || !department || !email || !password) return c.json({ error: "name, department, email, password required" }, 400);
+    const pwError = validatePassword(password);
+    if (pwError) return c.json({ error: pwError }, 400);
+    const id = `hod-${crypto.randomUUID().slice(0, 8)}`;
+    const hash2 = await hashPassword(password);
+    await c.env.DB.prepare("INSERT INTO hods (id, name, department, email, password_hash) VALUES (?, ?, ?, ?, ?)").bind(id, name, department, email, hash2).run();
+    await createAuditLog(c.env.DB, user.id, "super_admin", "HOD_CREATED", `HOD created: ${name} (${department})`);
+    return c.json({ success: true, id });
+  } catch (e) {
+    if (e.message?.includes("UNIQUE")) return c.json({ error: "HOD with this email already exists" }, 409);
+    return c.json({ error: "Failed to create HOD", details: e.message }, 500);
+  }
+});
+app.put("/api/admin/hods/:id", requireAuth, requireRole("super_admin"), async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  try {
+    const body = await c.req.json();
+    const { name, department, email, status } = body;
+    const updates = [];
+    const params = [];
+    if (name !== void 0) {
+      updates.push("name = ?");
+      params.push(name);
+    }
+    if (department !== void 0) {
+      updates.push("department = ?");
+      params.push(department);
+    }
+    if (email !== void 0) {
+      updates.push("email = ?");
+      params.push(email);
+    }
+    if (status !== void 0) {
+      updates.push("status = ?");
+      params.push(status);
+    }
+    if (updates.length === 0) return c.json({ error: "No fields to update" }, 400);
+    params.push(id);
+    await c.env.DB.prepare(`UPDATE hods SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+    await createAuditLog(c.env.DB, user.id, "super_admin", "HOD_UPDATED", `HOD ${id} updated: ${JSON.stringify(body)}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to update HOD", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/hods/:id/reset-password", requireAuth, requireRole("super_admin"), async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  try {
+    const { password } = await c.req.json();
+    if (!password) return c.json({ error: "password required" }, 400);
+    const pwError = validatePassword(password);
+    if (pwError) return c.json({ error: pwError }, 400);
+    const hash2 = await hashPassword(password);
+    await c.env.DB.prepare("UPDATE hods SET password_hash = ?, login_attempts = 0, locked_until = NULL WHERE id = ?").bind(hash2, id).run();
+    await createAuditLog(c.env.DB, user.id, "super_admin", "PASSWORD_RESET", `Password reset for HOD ${id}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to reset password", details: e.message }, 500);
+  }
+});
+app.get("/api/admin/hods", requireAuth, requireRole("super_admin", "admin"), async (c) => {
+  try {
+    const result = await c.env.DB.prepare("SELECT id, name, department, email, status, created_at FROM hods ORDER BY name").all();
+    return c.json({ hods: result.results });
+  } catch (e) {
+    return c.json({ error: "Database error" }, 500);
+  }
+});
+app.get("/api/admin/coordinators", requireAuth, requireRole("super_admin", "admin"), async (c) => {
+  try {
+    const result = await c.env.DB.prepare(
+      `SELECT m.id, m.uuid, m.full_name, m.email, m.phone, m.department,
+              GROUP_CONCAT(c.name) as club_names,
+              GROUP_CONCAT(c.id) as club_ids
+       FROM members m
+       LEFT JOIN faculty_club_assignments fca ON m.id = fca.faculty_member_id
+       LEFT JOIN clubs c ON fca.club_id = c.id
+       WHERE m.member_type = 'faculty'
+       GROUP BY m.id
+       ORDER BY m.full_name`
+    ).all();
+    return c.json({ coordinators: result.results?.map((f) => ({
+      ...f,
+      full_name: f.full_name?.trim(),
+      clubs: f.club_names ? f.club_names.split(",").map((n, i) => ({
+        id: parseInt(f.club_ids.split(",")[i]),
+        name: n
+      })) : []
+    })) || [] });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.get("/api/admin/club-accounts", requireAuth, requireRole("super_admin", "admin"), async (c) => {
+  try {
+    const result = await c.env.DB.prepare(
+      `SELECT cc.id, cc.email, cc.status, cc.login_attempts, cc.locked_until, cc.created_at, c.name as club_name
+       FROM coordinator_credentials cc
+       JOIN clubs c ON cc.club_id = c.id
+       ORDER BY c.name`
+    ).all();
+    return c.json({ accounts: result.results || [] });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/coordinators/:memberId/assign-club", requireAuth, requireRole("super_admin"), async (c) => {
+  const memberId = parseInt(c.req.param("memberId"));
+  const user = c.get("user");
+  try {
+    const { club_id } = await c.req.json();
+    if (!club_id) return c.json({ error: "club_id required" }, 400);
+    await c.env.DB.prepare("INSERT OR IGNORE INTO faculty_club_assignments (faculty_member_id, club_id) VALUES (?, ?)").bind(memberId, club_id).run();
+    const member = await c.env.DB.prepare("SELECT full_name FROM members WHERE id = ?").bind(memberId).first();
+    const club = await c.env.DB.prepare("SELECT name FROM clubs WHERE id = ?").bind(club_id).first();
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      "super_admin",
+      "FACULTY_ASSIGNED",
+      `Faculty ${member?.full_name?.trim()} assigned to club ${club?.name}`
+    );
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to assign", details: e.message }, 500);
+  }
+});
+app.delete("/api/admin/coordinators/:memberId/remove-club", requireAuth, requireRole("super_admin"), async (c) => {
+  const memberId = parseInt(c.req.param("memberId"));
+  const user = c.get("user");
+  try {
+    const { club_id } = await c.req.json();
+    if (!club_id) return c.json({ error: "club_id required" }, 400);
+    await c.env.DB.prepare("DELETE FROM faculty_club_assignments WHERE faculty_member_id = ? AND club_id = ?").bind(memberId, club_id).run();
+    await createAuditLog(c.env.DB, user.id, "super_admin", "FACULTY_REMOVED", `Faculty ${memberId} removed from club ${club_id}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to remove", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/clubs", requireAuth, requireRole("super_admin"), async (c) => {
+  const user = c.get("user");
+  try {
+    const { name, description } = await c.req.json();
+    if (!name) return c.json({ error: "name required" }, 400);
+    await c.env.DB.prepare("INSERT INTO clubs (name, description, status) VALUES (?, ?, ?)").bind(name, description || null, "active").run();
+    await createAuditLog(c.env.DB, user.id, "super_admin", "CLUB_CREATED", `Club created: ${name}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to create club", details: e.message }, 500);
+  }
+});
+app.put("/api/admin/clubs/:id", requireAuth, requireRole("super_admin"), async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  try {
+    const { name, description, status } = await c.req.json();
+    const updates = [];
+    const params = [];
+    if (name !== void 0) {
+      updates.push("name = ?");
+      params.push(name);
+    }
+    if (description !== void 0) {
+      updates.push("description = ?");
+      params.push(description);
+    }
+    if (status !== void 0) {
+      updates.push("status = ?");
+      params.push(status);
+    }
+    if (updates.length === 0) return c.json({ error: "No fields to update" }, 400);
+    params.push(id);
+    await c.env.DB.prepare(`UPDATE clubs SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+    await createAuditLog(c.env.DB, user.id, "super_admin", "CLUB_UPDATED", `Club ${id} updated: ${JSON.stringify({ name, description, status })}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to update club", details: e.message }, 500);
+  }
+});
+app.get("/api/settings", requireAuth, async (c) => {
+  try {
+    const result = await c.env.DB.prepare("SELECT key, value FROM settings ORDER BY key").all();
+    const settings = {};
+    for (const row of result.results || []) {
+      settings[row.key] = row.value;
+    }
+    return c.json({ settings });
+  } catch (e) {
+    return c.json({ error: "Database error" }, 500);
+  }
+});
+app.put("/api/settings", requireAuth, requireRole("super_admin"), async (c) => {
+  const user = c.get("user");
+  try {
+    const body = await c.req.json();
+    for (const [key, value] of Object.entries(body)) {
+      await c.env.DB.prepare(
+        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP"
+      ).bind(key, String(value), String(value)).run();
+    }
+    await createAuditLog(c.env.DB, user.id, "super_admin", "SETTINGS_UPDATED", `Settings updated: ${Object.keys(body).join(", ")}`);
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Failed to update settings", details: e.message }, 500);
+  }
+});
+app.get("/api/admin/health", requireAuth, requireRole("super_admin"), async (c) => {
+  try {
+    const members = await c.env.DB.prepare("SELECT COUNT(*) as count FROM members").first();
+    const clubs = await c.env.DB.prepare("SELECT COUNT(*) as count FROM clubs").first();
+    const permissions = await c.env.DB.prepare("SELECT COUNT(*) as count FROM permissions").first();
+    const auditLogs = await c.env.DB.prepare("SELECT COUNT(*) as count FROM audit_logs").first();
+    const notifications = await c.env.DB.prepare("SELECT COUNT(*) as count FROM notifications").first();
+    const lastAudit = await c.env.DB.prepare("SELECT created_at FROM audit_logs ORDER BY created_at DESC LIMIT 1").first();
+    const studentCredentials = await c.env.DB.prepare("SELECT COUNT(*) as count FROM student_credentials").first();
+    return c.json({
+      status: "healthy",
+      version: "1.2",
+      database: "connected",
+      worker: "running",
+      tables: {
+        members: members?.count || 0,
+        clubs: clubs?.count || 0,
+        permissions: permissions?.count || 0,
+        audit_logs: auditLogs?.count || 0,
+        notifications: notifications?.count || 0,
+        student_credentials: studentCredentials?.count || 0
+      },
+      last_audit_log: lastAudit?.created_at || null
+    });
+  } catch (e) {
+    return c.json({ status: "unhealthy", error: e.message }, 500);
+  }
+});
+app.get("/api/admin/admins", requireAuth, requireRole("super_admin"), async (c) => {
+  try {
+    const admins = await c.env.DB.prepare("SELECT id, name, email, role, created_at FROM admins").all();
+    return c.json({ admins: admins.results });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.post("/api/admin/admins", requireAuth, requireRole("super_admin"), async (c) => {
+  const { name, email, password, role } = await c.req.json();
+  if (!email || !password || !name) {
+    return c.json({ error: "Missing required fields" }, 400);
+  }
+  try {
+    const id = "admin-" + crypto.randomUUID().substring(0, 8);
+    const salt = bcryptjs_default.genSaltSync(10);
+    const passwordHash = bcryptjs_default.hashSync(password, salt);
+    await c.env.DB.prepare(
+      "INSERT INTO admins (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)"
+    ).bind(id, name, email, passwordHash, role || "admin").run();
+    const user = c.get("user");
+    await c.env.DB.prepare(
+      "INSERT INTO audit_logs (id, user_id, user_role, action, details) VALUES (?, ?, ?, ?, ?)"
+    ).bind(crypto.randomUUID(), user.id, user.role, "create_admin", `Created admin ${email} with role ${role || "admin"}`).run();
+    return c.json({ success: true, admin: { id, name, email, role: role || "admin" } });
+  } catch (e) {
+    if (e.message.includes("UNIQUE constraint failed")) {
+      return c.json({ error: "Email already exists" }, 400);
+    }
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.put("/api/admin/admins/:id/password", requireAuth, requireRole("super_admin"), async (c) => {
+  const id = c.req.param("id");
+  const { password } = await c.req.json();
+  try {
+    const salt = bcryptjs_default.genSaltSync(10);
+    const passwordHash = bcryptjs_default.hashSync(password, salt);
+    await c.env.DB.prepare("UPDATE admins SET password_hash = ? WHERE id = ?").bind(passwordHash, id).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
+  }
+});
+app.delete("/api/admin/admins/:id", requireAuth, requireRole("super_admin"), async (c) => {
+  const id = c.req.param("id");
+  try {
+    await c.env.DB.prepare("DELETE FROM admins WHERE id = ?").bind(id).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: "Database error", details: e.message }, 500);
   }
 });
 var src_default = app;
@@ -4885,7 +6163,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-V3Twlb/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-5BJm30/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -4919,7 +6197,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-V3Twlb/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-5BJm30/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
