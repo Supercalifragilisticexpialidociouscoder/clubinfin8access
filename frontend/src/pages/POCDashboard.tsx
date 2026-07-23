@@ -219,7 +219,7 @@ export default function POCDashboard() {
 
   // QR Scanner Logic
   useEffect(() => {
-    if (activeTab === 'scanner' && !scannedUuid) {
+    if (activeTab === 'scanner') {
       if (!scannerRef.current) {
         const html5QrCode = new Html5Qrcode("reader");
         scannerRef.current = html5QrCode;
@@ -250,6 +250,12 @@ export default function POCDashboard() {
             () => {}
           ).catch(console.error);
         });
+      } else {
+        if (scannedUuid) {
+          try { scannerRef.current.pause(true); } catch(e){}
+        } else {
+          try { scannerRef.current.resume(); } catch(e){}
+        }
       }
     } else {
       if (scannerRef.current) {
@@ -265,17 +271,7 @@ export default function POCDashboard() {
       }
     }
     return () => {
-      if (scannerRef.current) {
-        if (scannerRef.current.isScanning) {
-          scannerRef.current.stop().then(() => {
-            scannerRef.current?.clear();
-            scannerRef.current = null;
-          }).catch(() => { scannerRef.current = null; });
-        } else {
-          try { scannerRef.current.clear(); } catch(e){}
-          scannerRef.current = null;
-        }
-      }
+      // We only clean up on component unmount to prevent rapid state transition crashes
     };
   }, [activeTab, scannedUuid]);
 
