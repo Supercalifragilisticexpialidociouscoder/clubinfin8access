@@ -122,8 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const apiCall = async (path: string, options: RequestInit = {}): Promise<Response> => {
+    const isFormData = options.body instanceof FormData;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      ...(!isFormData && { 'Content-Type': 'application/json' }),
       ...(options.headers as Record<string, string> || {}),
     };
 

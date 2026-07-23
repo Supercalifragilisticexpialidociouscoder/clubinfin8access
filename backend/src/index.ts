@@ -44,6 +44,9 @@ function getUTCDateTime() {
 type Bindings = {
   DB: D1Database
   JWT_SECRET: string
+  CLOUDINARY_CLOUD_NAME: string
+  CLOUDINARY_API_KEY: string
+  CLOUDINARY_API_SECRET: string
 }
 
 type Variables = {
@@ -1217,6 +1220,85 @@ app.get('/api/members/:uuid/profile', requireAuth, async (c) => {
     })
   } catch (e: any) {
     return c.json({ error: 'Database error', details: e.message }, 500)
+  }
+})
+
+app.post('/api/members/:uuid/profile-image', requireAuth, async (c) => {
+  const uuid = c.req.param('uuid')
+  const user = c.get('user')
+
+  if (!user || user.id !== uuid) {
+    return c.json({ error: 'Unauthorized: Can only update your own profile image' }, 403)
+  }
+
+  try {
+    const formData = await c.req.parseBody()
+    const imageFile = formData['image']
+
+    if (!imageFile || !(imageFile instanceof File)) {
+      return c.json({ error: 'No image file provided' }, 400)
+    }
+
+    if (imageFile.size > 5 * 1024 * 1024) {
+      return c.json({ error: 'Image size exceeds 5MB limit' }, 400)
+    }
+
+    const cloudName = c.env.CLOUDINARY_CLOUD_NAME
+    const apiKey = c.env.CLOUDINARY_API_KEY
+    const apiSecret = c.env.CLOUDINARY_API_SECRET
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      return c.json({ error: 'Cloudinary credentials not configured' }, 500)
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    
+    // Generate signature: SHA1(timestamp=<timestamp><apiSecret>)
+    const paramsToSign = `timestamp=${timestamp}${apiSecret}`
+    const encoder = new TextEncoder()
+    const data = encoder.encode(paramsToSign)
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+    const cloudinaryFormData = new FormData()
+    cloudinaryFormData.append('file', imageFile)
+    cloudinaryFormData.append('api_key', apiKey)
+    cloudinaryFormData.append('timestamp', timestamp)
+    cloudinaryFormData.append('signature', signature)
+
+    const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: cloudinaryFormData
+    })
+
+    if (!cloudinaryRes.ok) {
+      const errRes = await cloudinaryRes.text()
+      console.error('Cloudinary upload error:', errRes)
+      return c.json({ error: 'Failed to upload image to Cloudinary' }, 500)
+    }
+
+    const result = await cloudinaryRes.json() as any
+    const secureUrl = result.secure_url
+
+    if (!secureUrl) {
+      return c.json({ error: 'Failed to get secure URL from Cloudinary' }, 500)
+    }
+
+    // Save to DB
+    await c.env.DB.prepare('UPDATE members SET photo_url = ? WHERE uuid = ?').bind(secureUrl, uuid).run()
+
+    await createAuditLog(
+      c.env.DB,
+      user.id,
+      user.role,
+      'PROFILE_IMAGE_UPLOAD',
+      `Member ${user.name} uploaded a new profile image`
+    )
+
+    return c.json({ success: true, photo_url: secureUrl })
+  } catch (e: any) {
+    return c.json({ error: 'Failed to upload profile image', details: e.message }, 500)
   }
 })
 

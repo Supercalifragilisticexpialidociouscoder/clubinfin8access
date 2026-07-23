@@ -5,8 +5,11 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 JWT_SECRET = "clubpass-jwt-secret-2024-production"
+CLOUDINARY_CLOUD_NAME = "tczzvpz3"
+CLOUDINARY_API_KEY = "299913721364446"
+CLOUDINARY_API_SECRET = "yRZHF31eOdKJL2HsEUFX-YSWn3g"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "clubpass-db"
-database_id = "cdd0e507-dd47-47a9-85b6-c7b6b842ac2b"
+database_id = "f018958f-2751-40ff-a5f0-52a11d57994e"

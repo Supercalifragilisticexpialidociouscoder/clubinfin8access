@@ -1,8 +1,13 @@
 {
+  "name": "clubinfin8access",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "cd frontend && npm install && npm run build"
+  },
   "dependencies": {
     "node": "^26.5.0"
-  },
-  "scripts": {
-    "build": "cd frontend && npm install && npm run build"
   }
 }
