@@ -440,7 +440,7 @@ export default function HODDashboard() {
         {/* QR Scanner Tab */}
         {activeTab === 'scanner' && (
           <div className="animate-fade-in max-w-2xl mx-auto">
-            {!scannedUuid ? (
+            <div className={scannedUuid ? 'hidden' : 'block'}>
               <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg overflow-hidden p-5">
                 <div className="text-center mb-4">
                   <h2 className="text-base font-semibold text-[var(--ia-text)] mb-1">Scan Student QR</h2>
@@ -453,7 +453,10 @@ export default function HODDashboard() {
                   <ShieldCheck className="w-3.5 h-3.5" /> Secured by Cloudflare D1
                 </div>
               </div>
-            ) : scanLoading ? (
+            </div>
+            
+            {scannedUuid && (
+              scanLoading ? (
               <div className="bg-[var(--ia-surface)] border border-[var(--ia-border)] rounded-lg p-10 text-center">
                 <div className="w-8 h-8 border-2 border-[var(--ia-accent)]/30 border-t-[var(--ia-accent)] rounded-full animate-spin mx-auto mb-3" />
                 <p className="text-sm text-[var(--ia-text-muted)]">Verifying Identity...</p>
@@ -566,7 +569,7 @@ export default function HODDashboard() {
                   </div>
                 )}
               </div>
-            ) : null}
+            ) : null)}
           </div>
         )}
 
