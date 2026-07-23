@@ -9,7 +9,7 @@ import { useAuth, API_BASE } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
 import SearchBar from '../components/SearchBar';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import AttendanceReportForm from '../components/AttendanceReportForm';
 import NotificationComposer from '../components/NotificationComposer';
 import {
@@ -100,7 +100,7 @@ export default function POCDashboard() {
   const [purpose, setPurpose] = useState('');
   const [remark, setRemark] = useState('');
   const [expectedReturnTime, setExpectedReturnTime] = useState('');
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [currentIST, setCurrentIST] = useState(getCurrentISTTimeStr());
   const [durationMode, setDurationMode] = useState<'quick' | 'custom'>('quick');
 
@@ -221,19 +221,52 @@ export default function POCDashboard() {
   useEffect(() => {
     if (activeTab === 'scanner' && !scannedUuid) {
       if (!scannerRef.current) {
-        scannerRef.current = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 }, videoConstraints: { facingMode: "environment" } }, false);
-        scannerRef.current.render(onScanSuccess, onScanFailure);
+        const html5QrCode = new Html5Qrcode("reader");
+        scannerRef.current = html5QrCode;
+
+        Html5Qrcode.getCameras().then(devices => {
+          if (devices && devices.length) {
+            let cameraId = devices[0].id;
+            for (const device of devices) {
+              const label = device.label.toLowerCase();
+              if (label.includes('back') && !label.includes('ultra')) {
+                cameraId = device.id;
+                break;
+              }
+            }
+            html5QrCode.start(
+              cameraId,
+              { fps: 10, qrbox: { width: 250, height: 250 } },
+              onScanSuccess,
+              () => {} // silent fail
+            ).catch(console.error);
+          }
+        }).catch(console.error);
       }
     } else {
       if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().then(() => {
+            scannerRef.current?.clear();
+            scannerRef.current = null;
+          }).catch(() => { scannerRef.current = null; });
+        } else {
+          try { scannerRef.current.clear(); } catch(e){}
+          scannerRef.current = null;
+        }
       }
     }
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().then(() => {
+            scannerRef.current?.clear();
+            scannerRef.current = null;
+          }).catch(() => { scannerRef.current = null; });
+        } else {
+          try { scannerRef.current.clear(); } catch(e){}
+          scannerRef.current = null;
+        }
       }
     };
   }, [activeTab, scannedUuid]);
