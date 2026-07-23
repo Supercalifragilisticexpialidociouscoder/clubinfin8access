@@ -1,6 +1,7 @@
 import { formatYear } from '../utils/formatters';
 import { useEffect, useState } from 'react';
 import ISTTime from '../components/ISTTime';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
 import { ClosePermissionModal } from '../components/ClosePermissionModal';
 import { useNavigate } from 'react-router-dom';
@@ -399,6 +400,7 @@ const checkExpired = (p: any) => {
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--ia-danger)] text-white text-[9px] flex items-center justify-center font-bold shadow-sm">{unreadCount}</span>
               </button>
             )}
+            <ThemeToggle />
             <div className="hidden sm:block">
               <ISTTime />
             </div>
@@ -510,7 +512,7 @@ const checkExpired = (p: any) => {
                             <div><p className="text-[var(--ia-text)] font-medium text-sm">{m.full_name}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{m.roll_number} &middot; {m.department} &middot; {formatYear(m.year)} &middot; {m.section} &middot; {m.club_name}</p></div>
                           </div>
                         </td>
-                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/10 text-[var(--ia-text-muted)] border border-slate-500/15'}`}>{m.status || 'active'}</span></td>
+                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15'}`}>{m.status || 'active'}</span></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-0.5">
                             <button onClick={() => setShowEditMember(m)} title="Edit" className="p-1.5 rounded text-[var(--ia-text-muted)] hover:bg-[var(--ia-border)] hover:text-[var(--ia-text)] transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
@@ -578,7 +580,7 @@ const checkExpired = (p: any) => {
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs hidden md:table-cell">{p.purpose || '—'}</td>
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs hidden md:table-cell">{p.hod_name || '—'}</td>
                         <td className="px-4 py-3">
-                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium flex items-center gap-1 w-fit ${p.effective_status === 'active' ? 'status-granted' : p.effective_status === 'closed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' ? 'bg-slate-500/10 text-slate-400 border border-slate-500/15' : 'status-rejected'}`}>
+                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium flex items-center gap-1 w-fit ${p.effective_status === 'active' ? 'status-granted' : p.effective_status === 'closed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' ? 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15' : 'status-rejected'}`}>
                             {p.effective_status === 'active' ? <><CheckCircle2 className="w-3 h-3" /> Active</> : p.effective_status === 'expired' ? <><Clock className="w-3 h-3" /> Expired</> : p.effective_status === 'closed' ? <><CheckCircle2 className="w-3 h-3" /> Closed</> : <><XCircle className="w-3 h-3" /> Rejected</>}
                           </span> 
                           
@@ -613,7 +615,7 @@ const checkExpired = (p: any) => {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${log.action?.includes('GRANTED') ? 'status-granted' : log.action?.includes('REJECTED') ? 'status-rejected' : log.action?.includes('LOGIN') ? 'bg-[var(--ia-info)]/15 text-[var(--ia-info)] border border-[var(--ia-info)]/20' : log.action?.includes('SCANNED') ? 'bg-purple-500/15 text-purple-400 border border-purple-500/20' : log.action?.includes('CREATED') ? 'bg-[var(--ia-success)]/15 text-[var(--ia-success)] border border-[var(--ia-success)]/20' : log.action?.includes('SUSPENDED') || log.action?.includes('ARCHIVED') ? 'bg-[var(--ia-danger)]/15 text-[var(--ia-danger)] border border-[var(--ia-danger)]/20' : 'bg-slate-500/10 text-[var(--ia-text-muted)] border border-slate-500/15'}`}>{log.action}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${log.action?.includes('GRANTED') ? 'status-granted' : log.action?.includes('REJECTED') ? 'status-rejected' : log.action?.includes('LOGIN') ? 'bg-[var(--ia-info)]/15 text-[var(--ia-info)] border border-[var(--ia-info)]/20' : log.action?.includes('SCANNED') ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20' : log.action?.includes('CREATED') ? 'bg-[var(--ia-success)]/15 text-[var(--ia-success)] border border-[var(--ia-success)]/20' : log.action?.includes('SUSPENDED') || log.action?.includes('ARCHIVED') ? 'bg-[var(--ia-danger)]/15 text-[var(--ia-danger)] border border-[var(--ia-danger)]/20' : 'bg-[var(--ia-completed)]/10 text-[var(--ia-text-muted)] border border-[var(--ia-completed)]/15'}`}>{log.action}</span>
                           <span className="text-[11px] text-[var(--ia-text-muted)] font-mono">{log.user_role}</span>
                         </div>
                         <p className="text-[13px] text-[var(--ia-text-secondary)] line-clamp-2">{log.details}</p>

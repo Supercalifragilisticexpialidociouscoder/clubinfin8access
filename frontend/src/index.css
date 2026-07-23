@@ -34,7 +34,48 @@
     --ring: 217 91% 60%;
     --radius: 0.5rem;
 
-    /* New Design Tokens */
+    /* Light Theme Design Tokens */
+    --ia-bg: #f8fafc;
+    --ia-surface: #ffffff;
+    --ia-elevated: #f1f5f9;
+    --ia-input: #ffffff;
+    --ia-border: #e2e8f0;
+    --ia-border-active: #cbd5e1;
+    --ia-text: #0f172a;
+    --ia-text-secondary: #475569;
+    --ia-text-muted: #64748b;
+    --ia-accent: #2563eb;
+    --ia-accent-hover: #1d4ed8;
+    --ia-success: #16a34a;
+    --ia-warning: #d97706;
+    --ia-danger: #dc2626;
+    --ia-info: #2563eb;
+    --ia-completed: #475569;
+  }
+
+  :root.dark {
+    /* Legacy tokens preserved for Tailwind config compatibility (Dark) */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 55%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 217 91% 60%;
+
+    /* Dark Theme Design Tokens */
     --ia-bg: #0f1117;
     --ia-surface: #161920;
     --ia-elevated: #1c1f28;

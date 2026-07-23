@@ -1,6 +1,7 @@
 import { formatYear } from '../utils/formatters';
 import { useEffect, useState, useRef } from 'react';
 import ISTTime from '../components/ISTTime';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
@@ -155,6 +156,7 @@ export default function StudentDashboard() {
               <ISTTime />
             </div>
             <div className="hidden sm:block h-5 w-px bg-[var(--ia-border)]" />
+            <ThemeToggle />
             <div className="text-right hidden sm:block">
               <p className="text-xs font-medium text-[var(--ia-text)]">{user?.name}</p>
               <p className="text-[11px] text-[var(--ia-text-muted)]">{user?.club_name}</p>

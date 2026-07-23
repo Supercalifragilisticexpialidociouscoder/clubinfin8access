@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ISTTime from '../components/ISTTime';
 import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
 import { ClosePermissionModal } from '../components/ClosePermissionModal';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useParams } from 'react-router-dom';
 import { useAuth, API_BASE } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
@@ -244,8 +245,11 @@ export default function VerifyMember() {
   const isCoordinator = user?.role === 'coordinator';
 
   return (
-    <div className="min-h-screen bg-[var(--ia-bg)] p-4 md:p-8">
-      <div className="mx-auto max-w-lg space-y-4">
+    <div className="min-h-screen bg-[var(--ia-bg)] p-4 md:p-8 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      <div className="mx-auto max-w-lg space-y-4 pt-12 md:pt-0">
         {/* ===== VERIFICATION STATUS HEADER ===== */}
         <div className={`rounded-lg p-5 text-center border ${
           isActive
@@ -360,13 +364,13 @@ export default function VerifyMember() {
             )}
 
             {today_permission.effective_status === 'expired' && (
-              <div className="bg-[var(--ia-surface)] border border-slate-500/25 rounded-lg p-5">
+              <div className="bg-[var(--ia-surface)] border border-[var(--ia-completed)]/25 rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[var(--ia-border)]">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center bg-slate-500/15">
-                    <Clock className="w-5 h-5 text-slate-400" />
+                  <div className="w-8 h-8 rounded-md flex items-center justify-center bg-[var(--ia-completed)]/15">
+                    <Clock className="w-5 h-5 text-[var(--ia-completed)]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-slate-400">
+                    <h3 className="font-semibold text-sm text-[var(--ia-completed)]">
                       Expired Permission
                     </h3>
                     <div className="flex items-center gap-1 mt-0.5 text-[11px] text-[var(--ia-text-muted)] font-mono">

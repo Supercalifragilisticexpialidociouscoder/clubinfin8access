@@ -2,6 +2,7 @@ import { formatYear } from '../utils/formatters';
 import { useEffect, useState } from 'react';
 import ISTTime from '../components/ISTTime';
 import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
@@ -327,6 +328,7 @@ export default function InstitutionAdminDashboard() {
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[var(--ia-danger)] text-white text-[9px] flex items-center justify-center font-bold">{unreadCount}</span>
               </button>
             )}
+            <ThemeToggle />
             <div className="text-right hidden sm:block">
               <p className="text-xs font-medium text-[var(--ia-text)]">{user?.name}</p>
               <p className="text-[11px] text-[var(--ia-text-muted)]">Institution Admin</p>
@@ -418,7 +420,7 @@ export default function InstitutionAdminDashboard() {
                             <div><p className="text-[var(--ia-text)] font-medium text-sm">{m.full_name}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{m.roll_number} &middot; {m.department} &middot; {formatYear(m.year)} &middot; {m.section} &middot; {m.club_name}</p></div>
                           </div>
                         </td>
-                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/10 text-[var(--ia-text-muted)] border border-slate-500/15'}`}>{m.status || 'active'}</span></td>
+                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15'}`}>{m.status || 'active'}</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -457,7 +459,7 @@ export default function InstitutionAdminDashboard() {
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs"><p>{p.date}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{p.approved_at ? formatISTTime(p.approved_at) : p.time}</p></td>
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs hidden md:table-cell">{p.purpose || '—'}</td>
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs hidden md:table-cell">{p.hod_name || '—'}</td>
-                        <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 w-fit ${p.effective_status === 'active' ? 'status-granted' : p.effective_status === 'closed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' ? 'bg-slate-500/10 text-slate-400 border border-slate-500/15' : 'status-rejected'}`}>
+                        <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 w-fit ${p.effective_status === 'active' ? 'status-granted' : p.effective_status === 'closed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' ? 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15' : 'status-rejected'}`}>
                           {p.effective_status === 'active' ? <><CheckCircle2 className="w-3 h-3" /> Active</> : p.effective_status === 'expired' ? <><Clock className="w-3 h-3" /> Expired</> : p.effective_status === 'closed' ? <><CheckCircle2 className="w-3 h-3" /> Closed</> : <><XCircle className="w-3 h-3" /> Rejected</>}
                         </span> {p.effective_status !== 'rejected' && p.approved_at && <div className="text-[10px] text-[var(--ia-text-muted)] mt-1 font-medium"><PermissionTimer permission={p} /></div>}</td>
                       </tr>

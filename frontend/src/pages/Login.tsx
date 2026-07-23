@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { ShieldCheck, AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react';
 
 export default function Login() {
@@ -164,7 +165,10 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--ia-bg)] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--ia-bg)] flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-sm animate-fade-in">
         {/* Brand */}
         <div className="text-center mb-6">

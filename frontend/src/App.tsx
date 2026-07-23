@@ -1,6 +1,7 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer } from './components/Toast';
 import { useDeviceNotifications } from './hooks/useDeviceNotifications';
 import Login from './pages/Login';
@@ -46,15 +47,15 @@ function NotFound() {
         <div className="w-16 h-16 rounded-full bg-blue-500/15 flex items-center justify-center mx-auto mb-4">
           <Search className="w-8 h-8 text-blue-400" />
         </div>
-        <h1 className="text-xl font-bold text-white mb-2">Page Not Found</h1>
-        <p className="text-slate-400 text-sm mb-4">The page you are looking for does not exist.</p>
+        <h1 className="text-xl font-bold text-[var(--ia-text)] mb-2">Page Not Found</h1>
+        <p className="text-[var(--ia-text-secondary)] text-sm mb-4">The page you are looking for does not exist.</p>
         <a
           href="/login"
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 transition-colors text-sm font-medium"
         >
           Go to Login
         </a>
-        <p className="text-xs text-slate-600 mt-6">Infin8 Access v1.2</p>
+        <p className="text-xs text-[var(--ia-text-muted)] mt-6">Infin8 Access v1.2</p>
       </div>
     </div>
   );
@@ -121,13 +122,15 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <DeviceNotificationManager />
-      <HashRouter>
-        <ToastContainer />
-        <AppRoutes />
-      </HashRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <DeviceNotificationManager />
+        <HashRouter>
+          <ToastContainer />
+          <AppRoutes />
+        </HashRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

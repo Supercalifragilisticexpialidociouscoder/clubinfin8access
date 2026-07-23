@@ -5,6 +5,7 @@ import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
+import { ThemeToggle } from '../components/ThemeToggle';
 import SearchBar from '../components/SearchBar';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AttendanceReportForm from '../components/AttendanceReportForm';
@@ -294,6 +295,7 @@ const checkExpired = (p: any) => {
               <ISTTime />
             </div>
             <div className="hidden sm:block h-5 w-px bg-[var(--ia-border)]" />
+            <ThemeToggle />
             <div className="text-right hidden sm:block">
               <p className="text-xs font-medium text-[var(--ia-text)]">{user?.name}</p>
               <p className="text-[11px] text-[var(--ia-text-muted)]">{user?.club_name}</p>
@@ -360,7 +362,7 @@ const checkExpired = (p: any) => {
                             <div><p className="text-[var(--ia-text)] font-medium text-sm">{m.full_name}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{m.roll_number} &middot; {m.department} &middot; {formatYear(m.year)} &middot; {m.section}</p></div>
                           </div>
                         </td>
-                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/10 text-[var(--ia-text-muted)] border border-slate-500/15'}`}>{m.status || 'active'}</span></td>
+                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15'}`}>{m.status || 'active'}</span></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <button onClick={() => navigate(`/verify/${m.uuid}`)} title="View Profile" className="p-1.5 rounded text-[var(--ia-text-muted)] hover:bg-[var(--ia-border)] hover:text-[var(--ia-text)] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></button>
@@ -468,7 +470,7 @@ const checkExpired = (p: any) => {
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)]"><p className="text-xs">{p.date}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{p.approved_at ? formatISTTime(p.approved_at) : p.time}</p></td>
                         <td className="px-4 py-3 text-xs space-y-0.5"><p className="text-[var(--ia-text-secondary)]">Purpose: {p.purpose}</p><p className="text-[var(--ia-text-muted)]">Processed by {p.hod_name}</p></td>
                         <td className="px-4 py-3">
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${p.effective_status === 'granted' ? 'status-granted' : p.effective_status === 'completed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' || p.effective_status === 'closed' ? 'bg-slate-500/10 text-slate-400 border border-slate-500/15' : 'status-rejected'}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${p.effective_status === 'granted' ? 'status-granted' : p.effective_status === 'completed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' || p.effective_status === 'closed' ? 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15' : 'status-rejected'}`}>
                             {p.effective_status ? p.effective_status.charAt(0).toUpperCase() + p.effective_status.slice(1) : p.status}
                           </span>
                         </td>

@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import ISTTime from '../components/ISTTime';
 import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
 import { ClosePermissionModal } from '../components/ClosePermissionModal';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, API_BASE } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
@@ -371,6 +372,7 @@ export default function HODDashboard() {
               <ISTTime />
             </div>
             <div className="hidden sm:block h-5 w-px bg-[var(--ia-border)]" />
+            <ThemeToggle />
             <div className="text-right hidden sm:block">
               <p className="text-xs font-medium text-[var(--ia-text)]">{user?.name}</p>
               <p className="text-[11px] text-[var(--ia-text-muted)]">{user?.department} Dept</p>
@@ -442,8 +444,8 @@ export default function HODDashboard() {
                 
                 {/* Permission Status / Form */}
                 {scannedData.today_permission && (
-                  <div className={`bg-[var(--ia-surface)] border rounded-lg p-4 mb-6 ${scannedData.today_permission.effective_status === 'active' ? 'border-[var(--ia-success)]/25' : scannedData.today_permission.effective_status === 'closed' ? 'border-[var(--ia-info)]/25' : scannedData.today_permission.effective_status === 'expired' ? 'border-slate-500/25' : 'border-[var(--ia-danger)]/25'}`}>
-                    <div className={`flex items-center gap-2 mb-2 font-semibold text-sm ${scannedData.today_permission.effective_status === 'active' ? 'text-[var(--ia-success)]' : scannedData.today_permission.effective_status === 'closed' ? 'text-[var(--ia-info)]' : scannedData.today_permission.effective_status === 'expired' ? 'text-slate-400' : 'text-[var(--ia-danger)]'}`}>
+                  <div className={`bg-[var(--ia-surface)] border rounded-lg p-4 mb-6 ${scannedData.today_permission.effective_status === 'active' ? 'border-[var(--ia-success)]/25' : scannedData.today_permission.effective_status === 'closed' ? 'border-[var(--ia-info)]/25' : scannedData.today_permission.effective_status === 'expired' ? 'border-[var(--ia-completed)]/25' : 'border-[var(--ia-danger)]/25'}`}>
+                    <div className={`flex items-center gap-2 mb-2 font-semibold text-sm ${scannedData.today_permission.effective_status === 'active' ? 'text-[var(--ia-success)]' : scannedData.today_permission.effective_status === 'closed' ? 'text-[var(--ia-info)]' : scannedData.today_permission.effective_status === 'expired' ? 'text-[var(--ia-completed)]' : 'text-[var(--ia-danger)]'}`}>
                       {scannedData.today_permission.effective_status === 'active' ? <CheckCircle2 className="w-4 h-4" /> : scannedData.today_permission.effective_status === 'closed' ? <CheckCircle2 className="w-4 h-4" /> : scannedData.today_permission.effective_status === 'expired' ? <Clock className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                       Permission {scannedData.today_permission.effective_status ? scannedData.today_permission.effective_status.charAt(0).toUpperCase() + scannedData.today_permission.effective_status.slice(1) : (scannedData.today_permission.status || '').charAt(0).toUpperCase() + (scannedData.today_permission.status || '').slice(1)}
                     </div>
@@ -549,7 +551,7 @@ export default function HODDashboard() {
                             <div><p className="text-[var(--ia-text)] font-medium text-sm">{m.full_name}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{m.roll_number} &middot; {m.department} &middot; {formatYear(m.year)} &middot; {m.section} &middot; {m.club_name}</p></div>
                           </div>
                         </td>
-                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-slate-500/10 text-[var(--ia-text-muted)] border border-slate-500/15'}`}>{m.status}</span></td>
+                        <td className="px-4 py-3"><span className={`text-[11px] px-2 py-0.5 rounded font-medium ${m.status === 'active' ? 'status-active' : m.status === 'suspended' ? 'status-inactive' : 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15'}`}>{m.status}</span></td>
                         <td className="px-4 py-3"><button className="text-[var(--ia-accent)] hover:text-blue-400 text-xs font-medium flex items-center gap-1">View <ArrowRight className="w-3 h-3" /></button></td>
                       </tr>
                     ))}
@@ -730,7 +732,7 @@ export default function HODDashboard() {
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)]"><p className="text-xs">{p.date}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{p.approved_at ? formatISTTime(p.approved_at) : p.time}</p></td>
                         <td className="px-4 py-3 text-xs space-y-0.5"><p className="text-[var(--ia-accent)]">{p.club_name}</p><p className="text-[var(--ia-text-muted)]">Purpose: {p.purpose}</p></td>
                         <td className="px-4 py-3">
-                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${p.effective_status === 'active' ? 'status-granted' : p.effective_status === 'closed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' ? 'bg-slate-500/10 text-slate-400 border border-slate-500/15' : 'status-rejected'}`}>
+                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${p.effective_status === 'active' ? 'status-granted' : p.effective_status === 'closed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' ? 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15' : 'status-rejected'}`}>
                             {p.effective_status ? p.effective_status.charAt(0).toUpperCase() + p.effective_status.slice(1) : (p.status || '').charAt(0).toUpperCase() + (p.status || '').slice(1)}
                           </span>
                         </td>
