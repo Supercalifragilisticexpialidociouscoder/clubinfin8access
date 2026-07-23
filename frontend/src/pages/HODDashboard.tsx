@@ -252,20 +252,25 @@ export default function HODDashboard() {
         });
       } else {
         if (scannedUuid) {
-          try { scannerRef.current.pause(true); } catch(e){}
+          try { if (scannerRef.current.getState() === 2) scannerRef.current.pause(true); } catch(e){}
         } else {
-          try { scannerRef.current.resume(); } catch(e){}
+          try { if (scannerRef.current.getState() === 3) scannerRef.current.resume(); } catch(e){}
         }
       }
     } else {
       if (scannerRef.current) {
-        if (scannerRef.current.isScanning) {
-          scannerRef.current.stop().then(() => {
-            scannerRef.current?.clear();
+        try {
+          const state = scannerRef.current.getState();
+          if (state === 2 || state === 3) {
+            scannerRef.current.stop().then(() => {
+              scannerRef.current?.clear();
+              scannerRef.current = null;
+            }).catch(() => { scannerRef.current = null; });
+          } else {
+            scannerRef.current.clear();
             scannerRef.current = null;
-          }).catch(() => { scannerRef.current = null; });
-        } else {
-          try { scannerRef.current.clear(); } catch(e){}
+          }
+        } catch(e) {
           scannerRef.current = null;
         }
       }
