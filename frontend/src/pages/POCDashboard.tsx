@@ -241,7 +241,15 @@ export default function POCDashboard() {
               () => {} // silent fail
             ).catch(console.error);
           }
-        }).catch(console.error);
+        }).catch(err => {
+          console.error("Failed to enumerate cameras, falling back to facingMode:", err);
+          html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            onScanSuccess,
+            () => {}
+          ).catch(console.error);
+        });
       }
     } else {
       if (scannerRef.current) {
