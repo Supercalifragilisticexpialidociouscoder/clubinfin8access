@@ -48,7 +48,7 @@ const calculateQuickOptions = (currentIST: string) => {
   }));
 };
 
-export default function HODDashboard() {
+export default function POCDashboard() {
 
   const { user, logout, apiCall } = useAuth();
   const navigate = useNavigate();
@@ -365,7 +365,7 @@ export default function HODDashboard() {
             </div>
             <div>
               <h1 className="text-sm font-semibold text-[var(--ia-text)]">Infin8 Access</h1>
-              <p className="text-[11px] text-[var(--ia-text-muted)] font-medium uppercase tracking-wider">Head of Department</p>
+              <p className="text-[11px] text-[var(--ia-text-muted)] font-medium uppercase tracking-wider">Point of Contact (POC)</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

@@ -44,6 +44,7 @@ export default function Login() {
         if (user.role === 'super_admin') navigate('/admin');
         else if (user.role === 'admin') navigate('/monitoring');
         else if (user.role === 'hod') navigate('/hod');
+        else if (user.role === 'poc') navigate('/poc');
         else if (user.role === 'coordinator') navigate('/coordinator');
         else if (user.role === 'student') navigate('/student');
         else navigate('/');
@@ -92,6 +93,7 @@ export default function Login() {
       if (u.role === 'super_admin') navigate('/admin');
       else if (u.role === 'admin') navigate('/monitoring');
       else if (u.role === 'hod') navigate('/hod');
+      else if (u.role === 'poc') navigate('/poc');
       else if (u.role === 'coordinator') navigate('/coordinator');
       else if (u.role === 'student') navigate('/student');
     }

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { requestNotificationPermission } from './utils/notifications';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer } from './components/Toast';
@@ -7,6 +8,7 @@ import { useDeviceNotifications } from './hooks/useDeviceNotifications';
 import Login from './pages/Login';
 import VerifyMember from './pages/VerifyMember';
 import HODDashboard from './pages/HODDashboard';
+import POCDashboard from './pages/POCDashboard';
 import CoordinatorDashboard from './pages/CoordinatorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import InstitutionAdminDashboard from './pages/InstitutionAdminDashboard';
@@ -98,6 +100,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/poc/*"
+        element={
+          <ProtectedRoute allowedRoles={['poc']}>
+            <POCDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/coordinator/*"
         element={
           <ProtectedRoute allowedRoles={['coordinator']}>
@@ -121,6 +131,10 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>

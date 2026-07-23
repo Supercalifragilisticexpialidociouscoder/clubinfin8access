@@ -277,13 +277,13 @@ app.post('/api/auth/login', async (c) => {
           id: hod.id,
           name: hod.name,
           email: hod.email,
-          role: 'hod',
+          role: (hod.role as string) || 'hod',
           department: hod.department,
           exp: Math.floor(Date.now() / 1000) + 86400
         }
         const token = await signJWT(tokenPayload, secret)
-        await createAuditLog(c.env.DB, hod.id as string, 'hod', 'LOGIN', `HOD login: ${identifier}`)
-        return c.json({ token, user: { id: hod.id, name: hod.name, email: hod.email, role: 'hod', department: hod.department } })
+        await createAuditLog(c.env.DB, hod.id as string, (hod.role as string) || 'hod', 'LOGIN', `HOD login: ${identifier}`)
+        return c.json({ token, user: { id: hod.id, name: hod.name, email: hod.email, role: (hod.role as string) || 'hod', department: hod.department } })
       } else {
         const attempts = ((hod.login_attempts as number) || 0) + 1
         if (attempts >= 5) {
@@ -601,7 +601,7 @@ app.get('/api/verify/:uuid', optionalAuth, async (c) => {
     // Check today's permission
     const today = getISTDate()
     const todayPermission = await c.env.DB.prepare(
-      'SELECT p.*, h.name as hod_name FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ?'
+      'SELECT p.*, h.name as hod_name, h.role as hod_role FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ?'
     ).bind(uuid, today).first()
 
     // Log QR scan
@@ -655,7 +655,7 @@ app.get('/api/verify/:uuid', optionalAuth, async (c) => {
         purpose: todayPermission.purpose,
         remark: todayPermission.remark,
         expected_return_time: todayPermission.expected_return_time,
-        approved_by: todayPermission.hod_name || 'Unknown',
+        approved_by: todayPermission.hod_name ? `${todayPermission.hod_name} (${todayPermission.hod_role === 'poc' ? 'POC' : 'HOD'})` : 'Unknown',
         approved_at: todayPermission.approved_at,
         completed_at: todayPermission.completed_at,
         created_at: todayPermission.created_at,
@@ -678,7 +678,7 @@ app.get('/api/permissions/today/:uuid', optionalAuth, async (c) => {
 
   try {
     const permission = await c.env.DB.prepare(
-      'SELECT p.*, h.name as hod_name FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ? ORDER BY p.created_at DESC'
+      'SELECT p.*, h.name as hod_name, h.role as hod_role FROM permissions p LEFT JOIN hods h ON p.hod_id = h.id WHERE p.member_uuid = ? AND p.date = ? ORDER BY p.created_at DESC'
     ).bind(uuid, today).first()
 
     if (permission) {
@@ -733,7 +733,7 @@ app.get('/api/fix-db', async (c) => {
 })
 
 // Grant or reject permission (HOD only)
-app.post('/api/permissions', requireAuth, requireRole('hod', 'super_admin'), async (c) => {
+app.post('/api/permissions', requireAuth, requireRole('hod', 'poc', 'super_admin'), async (c) => {
   try {
     const { member_uuid, purpose, remark, status, expected_return_time } = await c.req.json()
     const user = c.get('user')
@@ -785,9 +785,9 @@ app.post('/api/permissions', requireAuth, requireRole('hod', 'super_admin'), asy
       }
     }
 
-    // Fetch member for notification
+    // Fetch member for notification and validation
     const member = await c.env.DB.prepare(
-      `SELECT m.full_name, m.roll_number, c.name as club_name, mc.club_id
+      `SELECT m.full_name, m.roll_number, m.department, c.name as club_name, mc.club_id
        FROM members m
        JOIN member_clubs mc ON m.id = mc.member_id
        JOIN clubs c ON mc.club_id = c.id
@@ -796,6 +796,10 @@ app.post('/api/permissions', requireAuth, requireRole('hod', 'super_admin'), asy
 
     if (!member) {
       return c.json({ error: 'Member not found' }, 404)
+    }
+
+    if ((user.role === 'hod' || user.role === 'poc') && member.department !== user.department) {
+      return c.json({ error: 'Unauthorized: Cannot grant permission for a student in another department.' }, 403)
     }
 
     // Insert permission with extended fields
@@ -845,7 +849,7 @@ app.post('/api/permissions', requireAuth, requireRole('hod', 'super_admin'), asy
 
 // Complete permission (Coordinator only)
 
-app.post('/api/permissions/:id/close', requireAuth, requireRole('hod', 'super_admin'), async (c) => {
+app.post('/api/permissions/:id/close', requireAuth, requireRole('hod', 'poc', 'super_admin'), async (c) => {
   const id = c.req.param('id')
   const user = c.get('user')
   console.log('CLOSE PERMISSION CALLED WITH ID:', id, 'USER:', user.email);
@@ -859,8 +863,17 @@ app.post('/api/permissions/:id/close', requireAuth, requireRole('hod', 'super_ad
     }
     const close_reason = body?.close_reason || 'Student Returned';
 
-    const permission = await c.env.DB.prepare('SELECT * FROM permissions WHERE id = ?').bind(id).first()
+    const permission = await c.env.DB.prepare(
+      `SELECT p.*, m.department 
+       FROM permissions p 
+       JOIN members m ON p.member_uuid = m.uuid 
+       WHERE p.id = ?`
+    ).bind(id).first()
     if (!permission) return c.json({ error: 'Permission not found' }, 404)
+    
+    if ((user.role === 'hod' || user.role === 'poc') && permission.department !== user.department) {
+      return c.json({ error: 'Unauthorized: Cannot close permission for a student in another department.' }, 403)
+    }
     
     const currentHM = getISTTimeHM()
     const effective = computeEffectiveStatus(permission, getISTDate(), currentHM)
@@ -917,7 +930,7 @@ app.get('/api/permissions/history/:uuid', requireAuth, async (c) => {
 
   try {
     const permissions = await c.env.DB.prepare(
-      `SELECT p.*, h.name as hod_name 
+      `SELECT p.*, h.name as hod_name, h.role as hod_role 
        FROM permissions p 
        LEFT JOIN hods h ON p.hod_id = h.id 
        WHERE p.member_uuid = ? 
@@ -943,7 +956,7 @@ app.get('/api/permissions', requireAuth, async (c) => {
 
   try {
     let query = `
-      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
+      SELECT p.*, h.name as hod_name, h.role as hod_role, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
       FROM permissions p
       LEFT JOIN hods h ON p.hod_id = h.id
       LEFT JOIN members m ON m.uuid = p.member_uuid
@@ -969,9 +982,16 @@ app.get('/api/permissions', requireAuth, async (c) => {
         query += ' AND p.status = ?'; params.push(status)
       }
     }
-    if (department) { query += ' AND m.department = ?'; params.push(department) }
     
     const user = c.get('user')
+    
+    // Strict Backend Enforcement for HODs and POCs
+    if (user && (user.role === 'hod' || user.role === 'poc')) {
+      query += ' AND m.department = ?'; params.push(user.department)
+    } else if (department) { 
+      query += ' AND m.department = ?'; params.push(department) 
+    }
+
     if (user && user.role === 'coordinator' && user.club_id) {
       query += ' AND mc.club_id = ?'; params.push(user.club_id)
     } else if (club) { 
@@ -1045,9 +1065,16 @@ app.get('/api/members', requireAuth, async (c) => {
       const s = `%${search}%`
       params.push(s, s, s)
     }
-    if (department) { query += ' AND m.department = ?'; params.push(department) }
     
     const user = c.get('user')
+    
+    // Strict Backend Enforcement for HODs and POCs
+    if (user && (user.role === 'hod' || user.role === 'poc')) {
+      query += ' AND m.department = ?'; params.push(user.department)
+    } else if (department) { 
+      query += ' AND m.department = ?'; params.push(department) 
+    }
+
     if (user && user.role === 'coordinator' && user.club_id) {
       query += ' AND mc.club_id = ?'; params.push(user.club_id)
     } else if (club) { 
@@ -1159,7 +1186,7 @@ app.get('/api/members/:uuid/profile', requireAuth, async (c) => {
 
     // Permission history
     const permissions = await c.env.DB.prepare(
-      `SELECT p.*, h.name as hod_name FROM permissions p
+      `SELECT p.*, h.name as hod_name, h.role as hod_role FROM permissions p
        LEFT JOIN hods h ON p.hod_id = h.id
        WHERE p.member_uuid = ?
        ORDER BY p.created_at DESC LIMIT 20`
@@ -1286,7 +1313,7 @@ app.get('/api/notifications', requireAuth, async (c) => {
 })
 
 
-app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin', 'institution_admin', 'hod', 'coordinator'), async (c) => {
+app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin', 'institution_admin', 'hod', 'poc', 'coordinator'), async (c) => {
   const user = c.get('user')
   const { title, message, target_audience, club_id, department } = await c.req.json()
 
@@ -1301,7 +1328,7 @@ app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin',
     // 1. Authorize and build query based on role and target
     if (user.role === 'super_admin' || user.role === 'institution_admin') {
       if (target_audience === 'all_students') {
-        recipientQuery = "SELECT id, 'student' as role FROM members WHERE status IN ('active', 'inactive')"
+        recipientQuery = "SELECT coalesce(uuid, CAST(id AS TEXT)) as id, 'student' as role FROM members WHERE status IN ('active', 'inactive')"
       } else if (target_audience === 'all_hods') {
         recipientQuery = "SELECT id, 'hod' as role FROM hods"
       } else if (target_audience === 'all_coordinators') {
@@ -1310,14 +1337,14 @@ app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin',
                           SELECT id, 'coordinator' as role FROM coordinator_credentials`
       } else if (target_audience === 'club') {
         if (!club_id) return c.json({ error: 'club_id required' }, 400)
-        recipientQuery = "SELECT member_id as id, 'student' as role FROM member_clubs WHERE club_id = ?"
+        recipientQuery = "SELECT coalesce(m.uuid, CAST(m.id AS TEXT)) as id, 'student' as role FROM member_clubs mc JOIN members m ON mc.member_id = m.id WHERE mc.club_id = ?"
         queryParams.push(club_id)
       } else if (target_audience === 'department') {
         if (!department) return c.json({ error: 'department required' }, 400)
-        recipientQuery = "SELECT id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')"
+        recipientQuery = "SELECT coalesce(uuid, CAST(id AS TEXT)) as id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')"
         queryParams.push(department)
       } else if (target_audience === 'all') {
-        recipientQuery = `SELECT id, 'student' as role FROM members WHERE status IN ('active', 'inactive')
+        recipientQuery = `SELECT coalesce(uuid, CAST(id AS TEXT)) as id, 'student' as role FROM members WHERE status IN ('active', 'inactive')
                           UNION SELECT id, 'hod' as role FROM hods
                           UNION SELECT id, role FROM admins WHERE role IN ('institution_admin', 'super_admin')
                           UNION SELECT faculty_member_id as id, 'coordinator' as role FROM faculty_club_assignments GROUP BY faculty_member_id
@@ -1325,12 +1352,12 @@ app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin',
       } else {
         return c.json({ error: 'Invalid target_audience' }, 400)
       }
-    } else if (user.role === 'hod') {
+    } else if (user.role === 'hod' || user.role === 'poc') {
       if (target_audience !== 'department') return c.json({ error: 'HODs can only notify their department' }, 403)
       const hod = await c.env.DB.prepare('SELECT department FROM hods WHERE id = ?').bind(user.id).first()
       if (!hod || hod.department !== department) return c.json({ error: 'Unauthorized department' }, 403)
       
-      recipientQuery = "SELECT id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')"
+      recipientQuery = "SELECT coalesce(uuid, CAST(id AS TEXT)) as id, 'student' as role FROM members WHERE department = ? AND status IN ('active', 'inactive')"
       queryParams.push(department)
     } else if (user.role === 'coordinator') {
       if (target_audience !== 'club') return c.json({ error: 'Coordinators can only notify their clubs' }, 403)
@@ -1346,7 +1373,7 @@ app.post('/api/notifications/broadcast', requireAuth, requireRole('super_admin',
         return c.json({ error: 'Unauthorized club' }, 403)
       }
 
-      recipientQuery = "SELECT member_id as id, 'student' as role FROM member_clubs WHERE club_id = ?"
+      recipientQuery = "SELECT coalesce(m.uuid, CAST(m.id AS TEXT)) as id, 'student' as role FROM member_clubs mc JOIN members m ON mc.member_id = m.id WHERE mc.club_id = ?"
       queryParams.push(targetClub)
     }
 
@@ -1446,7 +1473,7 @@ app.get('/api/audit-logs', requireAuth, requireRole('super_admin'), async (c) =>
 // EXPORT ROUTES
 // ============================================================
 
-app.get('/api/export/members', requireAuth, requireRole('super_admin', 'hod'), async (c) => {
+app.get('/api/export/members', requireAuth, requireRole('super_admin', 'hod', 'poc'), async (c) => {
   const format = c.req.query('format') || 'csv'
   const club = c.req.query('club')
   const department = c.req.query('department')
@@ -1491,7 +1518,7 @@ app.get('/api/export/members', requireAuth, requireRole('super_admin', 'hod'), a
   }
 })
 
-app.get('/api/export/permissions', requireAuth, requireRole('super_admin', 'hod', 'institution_admin', 'coordinator'), async (c) => {
+app.get('/api/export/permissions', requireAuth, requireRole('super_admin', 'hod', 'poc', 'institution_admin', 'coordinator'), async (c) => {
   const format = c.req.query('format') || 'csv'
   const user = c.get('user')
   const dateFrom = c.req.query('date_from')
@@ -1504,7 +1531,7 @@ app.get('/api/export/permissions', requireAuth, requireRole('super_admin', 'hod'
 
   try {
     let query = `
-      SELECT p.*, h.name as hod_name, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
+      SELECT p.*, h.name as hod_name, h.role as hod_role, m.full_name as member_name, m.roll_number, m.department, m.year, m.section, c.name as club_name
       FROM permissions p
       LEFT JOIN hods h ON p.hod_id = h.id
       LEFT JOIN members m ON m.uuid = p.member_uuid
@@ -1539,7 +1566,7 @@ app.get('/api/export/permissions', requireAuth, requireRole('super_admin', 'hod'
     if (deptFilter) { query += ' AND m.department = ?'; params.push(deptFilter) }
 
     // Role-based authorization scoping
-    if (user.role === 'hod') {
+    if (user.role === 'hod' || user.role === 'poc') {
       const hod = await c.env.DB.prepare('SELECT department FROM hods WHERE id = ?').bind(user.id).first()
       if (hod) {
         query += ' AND m.department = ?'; params.push(hod.department)
@@ -1574,9 +1601,9 @@ app.get('/api/export/permissions', requireAuth, requireRole('super_admin', 'hod'
           p.expected_return_time || '16:00',
           p.completed_at || '',
           displayStatus,
-          p.hod_name || 'Unknown',
+          p.hod_name ? `${p.hod_name} (${p.hod_role === 'poc' ? 'POC' : 'HOD'})` : 'Unknown',
           p.completed_at || '',
-          p.completed_at ? (p.hod_name || 'System') : '' // Assuming HOD closed it if completed
+          p.completed_at ? (p.hod_name ? `${p.hod_name} (${p.hod_role === 'poc' ? 'POC' : 'HOD'})` : 'System') : ''
         ].map(v => `"\$\{String(v || '').replace(/"/g, '""')\}"`).join(',')
       })
       

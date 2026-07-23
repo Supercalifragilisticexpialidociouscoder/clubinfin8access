@@ -100,7 +100,7 @@ const checkExpired = (p: any) => {
     if (activeTab === 'active') loadActive();
     if (activeTab === 'completed') loadCompleted();
     if (activeTab === 'history') loadHistory();
-    if (activeTab === 'notifications') loadNotifications();
+    loadNotifications();
   };
 
   const loadSettings = async () => {
@@ -398,7 +398,7 @@ const checkExpired = (p: any) => {
                         <div>
                           <p className="text-[var(--ia-text)] font-medium text-sm">{p.member_name}</p>
                           <p className="text-[11px] text-[var(--ia-text-muted)] font-mono">{p.roll_number} &middot; {p.department} &middot; {formatYear(p.year)} &middot; {p.section}</p>
-                          <p className="text-xs text-[var(--ia-text-secondary)] mt-0.5">Purpose: {p.purpose} &middot; Appr: {p.hod_name}</p>
+                          <p className="text-xs text-[var(--ia-text-secondary)] mt-0.5">Purpose: {p.purpose} &middot; Appr: {p.hod_name ? `${p.hod_name} (${p.hod_role === 'poc' ? 'POC' : 'HOD'})` : ''}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-right">
@@ -468,7 +468,7 @@ const checkExpired = (p: any) => {
                       <tr key={p.id} className="hover:bg-[var(--ia-elevated)] transition-colors">
                         <td className="px-4 py-3"><p className="text-[var(--ia-text)] font-medium text-sm">{p.member_name}</p><p className="text-[11px] text-[var(--ia-text-muted)] font-mono">{p.roll_number} &middot; {p.department} &middot; {formatYear(p.year)} &middot; {p.section}</p></td>
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)]"><p className="text-xs">{p.date}</p><p className="text-[11px] text-[var(--ia-text-muted)]">{p.approved_at ? formatISTTime(p.approved_at) : p.time}</p></td>
-                        <td className="px-4 py-3 text-xs space-y-0.5"><p className="text-[var(--ia-text-secondary)]">Purpose: {p.purpose}</p><p className="text-[var(--ia-text-muted)]">Processed by {p.hod_name}</p></td>
+                        <td className="px-4 py-3 text-xs space-y-0.5"><p className="text-[var(--ia-text-secondary)]">Purpose: {p.purpose}</p><p className="text-[var(--ia-text-muted)]">Processed by {p.hod_name ? `${p.hod_name} (${p.hod_role === 'poc' ? 'POC' : 'HOD'})` : '—'}</p></td>
                         <td className="px-4 py-3">
                           <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${p.effective_status === 'granted' ? 'status-granted' : p.effective_status === 'completed' ? 'bg-[var(--ia-info)]/10 text-[var(--ia-info)] border border-[var(--ia-info)]/15' : p.effective_status === 'expired' || p.effective_status === 'closed' ? 'bg-[var(--ia-completed)]/10 text-[var(--ia-completed)] border border-[var(--ia-completed)]/15' : 'status-rejected'}`}>
                             {p.effective_status ? p.effective_status.charAt(0).toUpperCase() + p.effective_status.slice(1) : p.status}
