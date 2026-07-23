@@ -221,7 +221,7 @@ export default function POCDashboard() {
   useEffect(() => {
     if (activeTab === 'scanner' && !scannedUuid) {
       if (!scannerRef.current) {
-        scannerRef.current = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+        scannerRef.current = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 }, videoConstraints: { facingMode: "environment" } }, false);
         scannerRef.current.render(onScanSuccess, onScanFailure);
       }
     } else {
