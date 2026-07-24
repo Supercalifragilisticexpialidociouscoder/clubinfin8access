@@ -20,8 +20,44 @@ function DeviceNotificationManager() {
   return null;
 }
 
+import { useState } from 'react';
+import { Bell } from 'lucide-react';
+import { registerServiceWorkerAndSubscribe } from './utils/webPush';
+
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, apiFetch } = useAuth();
+  const [pushStatus, setPushStatus] = useState<string>(Notification.permission);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  useEffect(() => {
+    // If permission is already granted, make sure we subscribe and send to backend
+    if (user && Notification.permission === 'granted') {
+      handleSubscribe();
+    }
+  }, [user]);
+
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    try {
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        setPushStatus(perm);
+        if (perm !== 'granted') return;
+      }
+      
+      const sub = await registerServiceWorkerAndSubscribe();
+      if (sub) {
+        await apiFetch('/api/notifications/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({ subscription: sub }),
+        });
+      }
+    } catch (e) {
+      console.error('Failed to subscribe to push', e);
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -37,6 +73,35 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
 
   if (allowedRoles && !allowedRoles.includes(user.role as string)) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (pushStatus !== 'granted') {
+    return (
+      <div className="dark min-h-screen gradient-primary flex items-center justify-center p-4">
+        <div className="glass-card rounded-2xl p-8 max-w-sm w-full text-center animate-scale-in">
+          <div className="w-16 h-16 rounded-full bg-blue-500/15 flex items-center justify-center mx-auto mb-4">
+            <Bell className="w-8 h-8 text-blue-400" />
+          </div>
+          <h1 className="text-xl font-bold text-[var(--ia-text)] mb-2">Enable Notifications</h1>
+          <p className="text-[var(--ia-text-secondary)] text-sm mb-6">
+            Push notifications are mandatory to use INFIN8 Access so you never miss important updates and approvals.
+          </p>
+          {pushStatus === 'denied' ? (
+            <p className="text-red-400 text-sm mb-6">
+              You have blocked notifications. Please enable them in your browser settings and refresh.
+            </p>
+          ) : (
+            <button
+              onClick={handleSubscribe}
+              disabled={isSubscribing}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {isSubscribing ? 'Enabling...' : 'Enable Notifications'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

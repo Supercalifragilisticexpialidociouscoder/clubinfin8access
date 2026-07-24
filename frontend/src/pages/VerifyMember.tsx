@@ -268,7 +268,7 @@ export default function VerifyMember() {
           <h1 className={`text-lg font-semibold tracking-tight uppercase ${isActive ? 'text-[var(--ia-success)]' : 'text-[var(--ia-danger)]'}`}>
             {isActive ? 'Verified Active Member' : `Member ${member.status}`}
           </h1>
-          <p className="text-[var(--ia-text-muted)] text-[11px] mt-1">Scanned at {new Date().toLocaleString()}</p>
+          <p className="text-[var(--ia-text-muted)] text-[11px] mt-1">Scanned at {formatDateTime(new Date().toISOString())}</p>
         </div>
 
         {/* ===== ANTI-QR-SHARING: IDENTITY CARD ===== */}
@@ -530,3 +530,4 @@ function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; val
     </div>
   );
 }
+

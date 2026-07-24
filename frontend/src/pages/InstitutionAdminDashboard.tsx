@@ -1,4 +1,4 @@
-import { formatYear } from '../utils/formatters';
+import { formatYear, formatDateTime } from '../utils/formatters';
 import { useEffect, useState } from 'react';
 import ISTTime from '../components/ISTTime';
 import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
@@ -547,7 +547,7 @@ export default function InstitutionAdminDashboard() {
                     {auditLogs.length === 0 ? (<tr><td colSpan={4} className="px-4 py-8 text-center text-[var(--ia-text-muted)] text-sm">No audit logs found</td></tr>) :
                     auditLogs.map((log: any) => (
                       <tr key={log.id} className="hover:bg-[var(--ia-elevated)] transition-colors">
-                        <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs"><p>{new Date(log.created_at).toLocaleString()}</p></td>
+                        <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs"><p>{formatDateTime(log.created_at)}</p></td>
                         <td className="px-4 py-3 text-[var(--ia-text)] text-xs font-medium">{log.action}</td>
                         <td className="px-4 py-3 text-[var(--ia-text-secondary)] text-xs">{log.admin_name} ({log.admin_type})</td>
                         <td className="px-4 py-3 text-[var(--ia-text-muted)] text-xs hidden md:table-cell">{log.target_type} : {log.target_id} <br/><span className="text-[10px]">{log.details}</span></td>
@@ -910,3 +910,4 @@ function ViewQRModal({ member, settings, onClose }: { member: any; settings: any
     </ModalWrapper>
   );
 }
+

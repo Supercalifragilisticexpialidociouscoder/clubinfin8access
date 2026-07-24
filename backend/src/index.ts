@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { buildPushHTTPRequest } from '@pushforge/builder'
 
 
 // IST Helpers
@@ -143,7 +144,7 @@ export async function createAuditLog(
 
 // Notification helper
 export async function createNotification(
-  db: D1Database,
+  env: any,
   recipientId: string,
   recipientRole: string,
   type: string,
@@ -152,9 +153,53 @@ export async function createNotification(
   relatedMemberUuid?: string
 ) {
   const id = crypto.randomUUID()
-  await db.prepare(
+  await env.DB.prepare(
     'INSERT INTO notifications (id, recipient_id, recipient_role, type, title, message, related_member_uuid) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).bind(id, recipientId, recipientRole, type, title, message, relatedMemberUuid || null).run()
+
+  try {
+    const subs = await env.DB.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').bind(recipientId).all()
+    if (subs.results && subs.results.length > 0) {
+      for (const sub of subs.results) {
+        try {
+          const subscription = {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth
+            }
+          };
+          const messageData = {
+            payload: {
+              title,
+              body: message,
+              url: '/'
+            },
+            adminContact: env.VAPID_SUBJECT,
+          };
+          
+          const request = await buildPushHTTPRequest({
+            privateJWK: env.VAPID_PRIVATE_KEY,
+            message: messageData,
+            subscription
+          });
+          const response = await fetch(request.endpoint, {
+            method: 'POST',
+            headers: request.headers as any,
+            body: request.body
+          });
+          
+          if (response.status === 410 || response.status === 404) {
+            await env.DB.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(sub.id).run();
+          }
+        } catch (e) {
+          console.error('Failed to send push to subscription', sub.id, e);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Push notification error', e);
+  }
 }
 
 // Password hashing — bcryptjs for Workers (pure JS, no native deps)
@@ -827,8 +872,7 @@ app.post('/api/permissions', requireAuth, requireRole('hod', 'poc', 'super_admin
     ).bind(member.club_id).all()
 
     for (const coord of coordinators.results || []) {
-      await createNotification(
-        c.env.DB,
+      await createNotification(c.env,
         coord.uuid as string || String(coord.id),
         'coordinator',
         'permission_update',
@@ -1524,6 +1568,35 @@ app.patch('/api/notifications/read-all', requireAuth, async (c) => {
 })
 
 // ============================================================
+
+app.post('/api/notifications/subscribe', requireAuth, async (c) => {
+  const user = c.get('user')
+  const { subscription } = await c.req.json()
+  if (!subscription || !subscription.endpoint || !subscription.keys) return c.json({ error: 'Invalid subscription' }, 400)
+  
+  const id = crypto.randomUUID()
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?, ?)'
+    ).bind(id, user!.id, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    if (e.message.includes('UNIQUE')) return c.json({ success: true })
+    return c.json({ error: 'Failed to save subscription', details: e.message }, 500)
+  }
+})
+
+app.delete('/api/notifications/unsubscribe', requireAuth, async (c) => {
+  const user = c.get('user')
+  const { endpoint } = await c.req.json()
+  try {
+    await c.env.DB.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?').bind(user!.id, endpoint).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ error: 'Failed to remove subscription' }, 500)
+  }
+})
+
 // AUDIT LOG ROUTES
 // ============================================================
 
@@ -1896,7 +1969,7 @@ app.post('/api/admin/members', requireAuth, requireRole('super_admin'), async (c
         `SELECT m.uuid FROM faculty_club_assignments fca JOIN members m ON m.id = fca.faculty_member_id WHERE fca.club_id = ?`
       ).bind(club_id).all()
       for (const coord of coordinators.results || []) {
-        await createNotification(c.env.DB, coord.uuid as string, 'coordinator', 'member_added',
+        await createNotification(c.env, coord.uuid as string, 'coordinator', 'member_added',
           'New Member Added', `${full_name} (${roll_number}) has been added to the club.`, uuid)
       }
     }
@@ -2373,3 +2446,5 @@ app.delete('/api/admin/admins/:id', requireAuth, requireRole('super_admin'), asy
 })
 
 export default app
+
+

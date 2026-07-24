@@ -1,4 +1,4 @@
-import { formatYear } from '../utils/formatters';
+import { formatYear, formatDateTime } from '../utils/formatters';
 import { useEffect, useState } from 'react';
 import ISTTime from '../components/ISTTime';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -620,7 +620,7 @@ const checkExpired = (p: any) => {
                         </div>
                         <p className="text-[13px] text-[var(--ia-text-secondary)] line-clamp-2">{log.details}</p>
                       </div>
-                      <p className="text-[11px] text-[var(--ia-text-muted)] whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</p>
+                      <p className="text-[11px] text-[var(--ia-text-muted)] whitespace-nowrap">{formatDateTime(log.created_at)}</p>
                     </div>
                   </div>
                 ))}
@@ -818,7 +818,7 @@ const checkExpired = (p: any) => {
                       <div key={n.id} className={`px-4 py-3 hover:bg-[var(--ia-elevated)] transition-colors ${n.read_status === 0 ? 'bg-[var(--ia-accent)]/5' : ''}`}>
                         <p className="text-sm text-[var(--ia-text)] font-medium">{n.title}</p>
                         <p className="text-[13px] text-[var(--ia-text-secondary)] mt-0.5 whitespace-pre-wrap">{n.message}</p>
-                        <p className="text-[11px] text-[var(--ia-text-muted)] mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                        <p className="text-[11px] text-[var(--ia-text-muted)] mt-1">{formatDateTime(n.created_at)}</p>
                       </div>
                     ))}
                   </div>
@@ -856,7 +856,7 @@ const checkExpired = (p: any) => {
                 <HealthItem label="Version" value={healthData.version || '1.2'} isGood />
                 <HealthItem label="Database" value={healthData.database} isGood={healthData.database === 'connected'} />
                 <HealthItem label="Worker" value={healthData.worker} isGood={healthData.worker === 'running'} />
-                <HealthItem label="Last Audit Log" value={healthData.last_audit_log ? new Date(healthData.last_audit_log).toLocaleString() : 'N/A'} isGood />
+                <HealthItem label="Last Audit Log" value={healthData.last_audit_log ? formatDateTime(healthData.last_audit_log) : 'N/A'} isGood />
               </div>
               <div className="mt-5 pt-3 border-t border-[var(--ia-border)]">
                 <h4 className="text-[11px] font-medium text-[var(--ia-text-muted)] uppercase tracking-wide mb-2">Table Counts</h4>
@@ -1183,3 +1183,4 @@ function AdminFormModal({ admin, onSave, onClose }: any) {
     </ModalWrapper>
   );
 }
+

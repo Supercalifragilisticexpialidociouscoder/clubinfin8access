@@ -1,4 +1,4 @@
-import { formatYear } from '../utils/formatters';
+import { formatYear, formatDateTime } from '../utils/formatters';
 import { useEffect, useState, useRef } from 'react';
 import ISTTime from '../components/ISTTime';
 import { PermissionTimer, formatISTTime } from '../components/ActiveTimer';
@@ -746,7 +746,7 @@ export default function HODDashboard() {
                       <div key={n.id} className={`px-4 py-3 hover:bg-[var(--ia-elevated)] transition-colors ${n.read_status === 0 ? 'bg-[var(--ia-accent)]/5' : ''}`}>
                         <p className="text-sm text-[var(--ia-text)] font-medium">{n.title}</p>
                         <p className="text-[13px] text-[var(--ia-text-secondary)] mt-0.5 whitespace-pre-wrap">{n.message}</p>
-                        <p className="text-[11px] text-[var(--ia-text-muted)] mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                        <p className="text-[11px] text-[var(--ia-text-muted)] mt-1">{formatDateTime(n.created_at)}</p>
                       </div>
                     ))}
                   </div>
@@ -808,3 +808,4 @@ function Pagination({ page, setPage, total }: { page: number; setPage: (fn: (p: 
 }
 
 function Users_Icon(props: any) { return <User {...props} /> }
+
