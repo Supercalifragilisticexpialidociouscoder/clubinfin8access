@@ -422,7 +422,7 @@ app.post('/api/auth/login', async (c) => {
 
     // Check student credentials (login with roll number)
     const studentData = await c.env.DB.prepare(
-      `SELECT sc.password_hash, sc.status as cred_status, sc.locked_until, sc.login_attempts, sc.must_change_password,
+      `SELECT sc.password_hash, sc.locked_until, sc.login_attempts, sc.must_change_password,
               m.id as member_id, m.uuid, m.full_name, m.email as student_email, m.department, m.status as member_status, m.roll_number,
               mc.club_id, c.name as club_name
        FROM members m
@@ -433,7 +433,7 @@ app.post('/api/auth/login', async (c) => {
     ).bind(identifier).first()
     
     if (studentData) {
-      if (studentData.member_status === 'suspended' || studentData.cred_status === 'suspended') {
+      if (studentData.member_status === 'suspended') {
         return c.json({ error: 'Account has been suspended. Contact the administrator.' }, 403)
       }
       if (studentData.member_status === 'archived' || studentData.member_status === 'graduated') {
@@ -780,6 +780,12 @@ app.get('/api/fix-db', async (c) => {
   }
 })
 
+// Helper for department normalization
+function normalizeDept(dept: string | null | undefined): string {
+  if (!dept) return '';
+  return dept.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 // Grant or reject permission (HOD only)
 app.post('/api/permissions', requireAuth, requireRole('hod', 'poc', 'super_admin'), async (c) => {
   try {
@@ -846,8 +852,8 @@ app.post('/api/permissions', requireAuth, requireRole('hod', 'poc', 'super_admin
       return c.json({ error: 'Member not found' }, 404)
     }
 
-    if ((user.role === 'hod' || user.role === 'poc') && member.department !== user.department) {
-      return c.json({ error: 'Unauthorized: Cannot grant permission for a student in another department.' }, 403)
+    if ((user?.role === 'hod' || user?.role === 'poc') && normalizeDept(member.department) !== normalizeDept(user?.department)) {
+      return c.json({ error: 'Unauthorized Access: Cannot grant permission for a student in another department.' }, 403)
     }
 
     // Insert permission with extended fields
@@ -918,8 +924,8 @@ app.post('/api/permissions/:id/close', requireAuth, requireRole('hod', 'poc', 's
     ).bind(id).first()
     if (!permission) return c.json({ error: 'Permission not found' }, 404)
     
-    if ((user.role === 'hod' || user.role === 'poc') && permission.department !== user.department) {
-      return c.json({ error: 'Unauthorized: Cannot close permission for a student in another department.' }, 403)
+    if ((user?.role === 'hod' || user?.role === 'poc') && normalizeDept(permission.department) !== normalizeDept(user?.department)) {
+      return c.json({ error: 'Unauthorized Access: Cannot close permission for a student in another department.' }, 403)
     }
     
     const currentHM = getISTTimeHM()
