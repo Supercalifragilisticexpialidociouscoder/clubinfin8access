@@ -6,6 +6,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { useParams } from 'react-router-dom';
 import { useAuth, API_BASE } from '../contexts/AuthContext';
 import { toast } from '../components/Toast';
+import { formatDateTime } from '../utils/formatters';
 import {
   ShieldCheck, AlertTriangle, User, Calendar, Clock, Building2,
   MapPin, Hash, Shield, Mail, CheckCircle2, XCircle, Info, FileText,

@@ -1,6 +1,53 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { buildPushHTTPRequest } from '@pushforge/builder'
+
+function base64url(source: ArrayBuffer | string): string {
+  let encoded = typeof source === 'string' ? btoa(source) : btoa(String.fromCharCode(...new Uint8Array(source)));
+  return encoded.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+async function getFcmAccessToken(clientEmail: string, privateKey: string): Promise<string> {
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const claim = {
+    iss: clientEmail,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  };
+
+  const headerStr = base64url(JSON.stringify(header));
+  const claimStr = base64url(JSON.stringify(claim));
+  const signatureInput = `${headerStr}.${claimStr}`;
+
+  const pemHeader = "-----BEGIN PRIVATE KEY-----";
+  const pemFooter = "-----END PRIVATE KEY-----";
+  let pemContents = privateKey.replace(pemHeader, "").replace(pemFooter, "").replace(/\s/g, "");
+  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8", binaryDer.buffer, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false, ["sign"]
+  );
+
+  const signatureBuffer = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(signatureInput)
+  );
+
+  const signature = base64url(signatureBuffer);
+  const jwt = `${signatureInput}.${signature}`;
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+  });
+
+  const data = await response.json() as any;
+  if (!data.access_token) throw new Error('Failed to get FCM token');
+  return data.access_token;
+}
 
 
 // IST Helpers
@@ -160,40 +207,66 @@ export async function createNotification(
   try {
     const subs = await env.DB.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').bind(recipientId).all()
     if (subs.results && subs.results.length > 0) {
-      for (const sub of subs.results) {
+      let accessToken = '';
+      if (env.FCM_CLIENT_EMAIL && env.FCM_PRIVATE_KEY) {
         try {
-          const subscription = {
-            endpoint: sub.endpoint,
-            keys: {
-              p256dh: sub.p256dh,
-              auth: sub.auth
+          accessToken = await getFcmAccessToken(env.FCM_CLIENT_EMAIL, env.FCM_PRIVATE_KEY);
+        } catch (e) {
+          console.error('Failed to generate FCM access token', e);
+        }
+      } else {
+        console.warn('FCM_CLIENT_EMAIL or FCM_PRIVATE_KEY is missing from environment.');
+      }
+
+      for (const sub of subs.results) {
+        if (!accessToken) break;
+        const fcmToken = sub.endpoint;
+        if (!fcmToken || fcmToken.includes('https://')) {
+          console.warn('Skipping legacy Web Push subscription:', fcmToken);
+          continue;
+        }
+
+        try {
+          const payload = {
+            message: {
+              token: fcmToken,
+              notification: {
+                title: title,
+                body: message
+              },
+              data: {
+                url: '/'
+              },
+              webpush: {
+                fcm_options: {
+                  link: '/'
+                }
+              }
             }
           };
-          const messageData = {
-            payload: {
-              title,
-              body: message,
-              url: '/'
-            },
-            adminContact: env.VAPID_SUBJECT,
-          };
-          
-          const request = await buildPushHTTPRequest({
-            privateJWK: env.VAPID_PRIVATE_KEY,
-            message: messageData,
-            subscription
-          });
-          const response = await fetch(request.endpoint, {
+
+          const projectId = env.FCM_PROJECT_ID || 'infin8clubb';
+          const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
             method: 'POST',
-            headers: request.headers as any,
-            body: request.body
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
           });
           
-          if (response.status === 410 || response.status === 404) {
-            await env.DB.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(sub.id).run();
+          if (response.status === 404 || response.status === 401 || response.status === 403) {
+            const errRes = await response.json() as any;
+            if (errRes.error?.status === 'UNREGISTERED' || response.status === 404) {
+               await env.DB.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(sub.id).run();
+            } else {
+               console.error('FCM Send Error:', errRes);
+            }
+          } else if (!response.ok) {
+             console.error('FCM HTTP Error:', response.status, await response.text());
           }
         } catch (e) {
-          console.error('Failed to send push to subscription', sub.id, e);
+          console.error('Failed to send push to FCM token', sub.id, e);
         }
       }
     }
@@ -422,7 +495,7 @@ app.post('/api/auth/login', async (c) => {
 
     // Check student credentials (login with roll number)
     const studentData = await c.env.DB.prepare(
-      `SELECT sc.password_hash, sc.locked_until, sc.login_attempts, sc.must_change_password,
+      `SELECT sc.password_hash, sc.status as cred_status, sc.locked_until, sc.login_attempts, sc.must_change_password,
               m.id as member_id, m.uuid, m.full_name, m.email as student_email, m.department, m.status as member_status, m.roll_number,
               mc.club_id, c.name as club_name
        FROM members m
@@ -433,7 +506,7 @@ app.post('/api/auth/login', async (c) => {
     ).bind(identifier).first()
     
     if (studentData) {
-      if (studentData.member_status === 'suspended') {
+      if (studentData.member_status === 'suspended' || studentData.cred_status === 'suspended') {
         return c.json({ error: 'Account has been suspended. Contact the administrator.' }, 403)
       }
       if (studentData.member_status === 'archived' || studentData.member_status === 'graduated') {
@@ -780,12 +853,6 @@ app.get('/api/fix-db', async (c) => {
   }
 })
 
-// Helper for department normalization
-function normalizeDept(dept: string | null | undefined): string {
-  if (!dept) return '';
-  return dept.toUpperCase().replace(/[^A-Z0-9]/g, '');
-}
-
 // Grant or reject permission (HOD only)
 app.post('/api/permissions', requireAuth, requireRole('hod', 'poc', 'super_admin'), async (c) => {
   try {
@@ -852,8 +919,8 @@ app.post('/api/permissions', requireAuth, requireRole('hod', 'poc', 'super_admin
       return c.json({ error: 'Member not found' }, 404)
     }
 
-    if ((user?.role === 'hod' || user?.role === 'poc') && normalizeDept(member.department) !== normalizeDept(user?.department)) {
-      return c.json({ error: 'Unauthorized Access: Cannot grant permission for a student in another department.' }, 403)
+    if ((user.role === 'hod' || user.role === 'poc') && member.department !== user.department) {
+      return c.json({ error: 'Unauthorized: Cannot grant permission for a student in another department.' }, 403)
     }
 
     // Insert permission with extended fields
@@ -924,8 +991,8 @@ app.post('/api/permissions/:id/close', requireAuth, requireRole('hod', 'poc', 's
     ).bind(id).first()
     if (!permission) return c.json({ error: 'Permission not found' }, 404)
     
-    if ((user?.role === 'hod' || user?.role === 'poc') && normalizeDept(permission.department) !== normalizeDept(user?.department)) {
-      return c.json({ error: 'Unauthorized Access: Cannot close permission for a student in another department.' }, 403)
+    if ((user.role === 'hod' || user.role === 'poc') && permission.department !== user.department) {
+      return c.json({ error: 'Unauthorized: Cannot close permission for a student in another department.' }, 403)
     }
     
     const currentHM = getISTTimeHM()
@@ -1578,13 +1645,34 @@ app.patch('/api/notifications/read-all', requireAuth, async (c) => {
 app.post('/api/notifications/subscribe', requireAuth, async (c) => {
   const user = c.get('user')
   const { subscription } = await c.req.json()
-  if (!subscription || !subscription.endpoint || !subscription.keys) return c.json({ error: 'Invalid subscription' }, 400)
+  
+  let endpoint = '';
+  let p256dh = '';
+  let auth = '';
+  
+  if (typeof subscription === 'string') {
+    // It's an FCM Token
+    endpoint = subscription;
+  } else if (subscription && subscription.endpoint) {
+    // Legacy Web Push
+    endpoint = subscription.endpoint;
+    p256dh = subscription.keys?.p256dh || '';
+    auth = subscription.keys?.auth || '';
+  } else {
+    return c.json({ error: 'Invalid subscription' }, 400)
+  }
   
   const id = crypto.randomUUID()
   try {
+    // Check if token already exists
+    const existing = await c.env.DB.prepare('SELECT id FROM push_subscriptions WHERE user_id = ? AND endpoint = ?').bind(user!.id, endpoint).first();
+    if (existing) {
+      return c.json({ success: true, message: 'Already subscribed' });
+    }
+
     await c.env.DB.prepare(
       'INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?, ?)'
-    ).bind(id, user!.id, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth).run()
+    ).bind(id, user!.id, endpoint, p256dh, auth).run()
     return c.json({ success: true })
   } catch (e: any) {
     if (e.message.includes('UNIQUE')) return c.json({ success: true })
